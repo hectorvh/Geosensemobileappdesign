@@ -18,7 +18,7 @@
         'lucide-react@0.487.0': 'lucide-react',
         'leaflet@1.9.4': 'leaflet',
         'input-otp@1.4.2': 'input-otp',
-        'figma:asset/d4d12bf60404945ce5cef288c636fc415fada758.png': path.resolve(__dirname, './src/assets/d4d12bf60404945ce5cef288c636fc415fada758.png'),
+        '20250621-P1300259-2-3.jpg': path.resolve(__dirname, './src/assets/20250621-P1300259-2-3.jpg'),
         'embla-carousel-react@8.6.0': 'embla-carousel-react',
         'cmdk@1.1.1': 'cmdk',
         'class-variance-authority@0.7.1': 'class-variance-authority',

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
-import welcomeImage from 'figma:asset/d4d12bf60404945ce5cef288c636fc415fada758.png';
+import welcomeImage from '../assets/20250621-P1300259-2-3.jpg';
 
 export const Welcome: React.FC = () => {
   const navigate = useNavigate();
