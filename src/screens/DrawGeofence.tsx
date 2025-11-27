@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
-import { SimpleMap } from '../components/SimpleMap';
+import { LeafletMap } from '../components/LeafletMap';
 import { useApp } from '../contexts/AppContext';
 import { MapPin, Navigation, X, Trash2 } from 'lucide-react';
 
@@ -153,7 +153,7 @@ export const DrawGeofence: React.FC = () => {
 
       {/* Map */}
       <div className="flex-1 relative">
-        <SimpleMap
+        <LeafletMap
           center={mapCenter}
           zoom={13}
           onMapClick={handleMapClick}

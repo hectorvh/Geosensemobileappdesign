@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../contexts/AppContext';
-import { SimpleMap } from '../SimpleMap';
+import { LeafletMap } from '../LeafletMap';
 import { GeoButton } from '../GeoButton';
 import { MapPin, Trash2, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -101,7 +101,7 @@ export const MapTab: React.FC = () => {
   return (
     <div className="h-full relative">
       {/* Map */}
-      <SimpleMap
+      <LeafletMap
         center={getMapCenter()}
         zoom={13}
         polygons={polygons}

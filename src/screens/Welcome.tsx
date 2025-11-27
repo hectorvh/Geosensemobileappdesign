@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
+import welcomeImage from 'figma:asset/d4d12bf60404945ce5cef288c636fc415fada758.png';
 
 export const Welcome: React.FC = () => {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export const Welcome: React.FC = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-30"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1641062680671-fec389e4eeeb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsaXZlc3RvY2slMjBncmF6aW5nJTIwZmllbGR8ZW58MXx8fHwxNzY0MjcxODM4fDA&ixlib=rb-4.1.0&q=80&w=1080')`
+          backgroundImage: `url(${welcomeImage})`
         }}
       />
       
