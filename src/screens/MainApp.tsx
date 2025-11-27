@@ -1,0 +1,68 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home, Map as MapIcon, Bell, BarChart3, Settings } from 'lucide-react';
+import { HomeTab } from '../components/tabs/HomeTab';
+import { MapTab } from '../components/tabs/MapTab';
+import { AlertsTab } from '../components/tabs/AlertsTab';
+import { AnalyticsTab } from '../components/tabs/AnalyticsTab';
+
+type TabType = 'home' | 'map' | 'alerts' | 'analytics';
+
+export const MainApp: React.FC = () => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<TabType>('home');
+
+  const tabs = [
+    { id: 'home' as TabType, icon: Home, label: 'Home' },
+    { id: 'map' as TabType, icon: MapIcon, label: 'Map' },
+    { id: 'alerts' as TabType, icon: Bell, label: 'Alerts' },
+    { id: 'analytics' as TabType, icon: BarChart3, label: 'Analytics' },
+  ];
+
+  return (
+    <div className="mobile-screen flex flex-col">
+      {/* Header */}
+      <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center justify-between shrink-0">
+        <h3>GeoSense</h3>
+        <button
+          onClick={() => navigate('/settings')}
+          className="p-2 hover:bg-[var(--pine-green)] rounded-lg transition-colors"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'home' && <HomeTab />}
+        {activeTab === 'map' && <MapTab />}
+        {activeTab === 'alerts' && <AlertsTab />}
+        {activeTab === 'analytics' && <AnalyticsTab />}
+      </div>
+
+      {/* Bottom Tab Navigation */}
+      <div className="bg-white border-t border-gray-200 shrink-0">
+        <div className="flex items-center justify-around p-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
+                  isActive
+                    ? 'text-[var(--grass-green)]'
+                    : 'text-gray-500 hover:text-[var(--pine-green)]'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-xs">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
