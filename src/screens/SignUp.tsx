@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { useApp } from '../contexts/AppContext';
+import welcomeImage from '@/assets/20250621-P1300259-2-3.jpg';
 
 export const SignUp: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ export const SignUp: React.FC = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-20"
         style={{
-          backgroundImage: `url('/src/assets/20250621-P1300259-2-3.jpg')`
+          backgroundImage: `url(${welcomeImage})`
         }}
       />
       
