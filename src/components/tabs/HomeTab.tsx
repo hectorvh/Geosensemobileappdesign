@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
+import welcomeImage from '@/assets/20250621-P1300259-2-3.jpg';
 
 export const HomeTab: React.FC = () => {
   const { devices, alerts } = useApp();
@@ -24,6 +25,13 @@ export const HomeTab: React.FC = () => {
 
   return (
     <div className="h-full green-gradient-bg p-4 overflow-y-auto">
+      {/* Background Image Overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-20"
+        style={{
+          backgroundImage: `url(${welcomeImage})`
+        }}
+      />
       <div className="space-y-4 max-w-md mx-auto">
         {/* Summary Cards */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">

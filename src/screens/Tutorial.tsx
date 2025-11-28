@@ -16,7 +16,12 @@ export const Tutorial: React.FC = () => {
                 backgroundImage: `url(${backgroundImage})`
               }}
             />
-      <h1 className="text-white text-center mb-6">Let's start creating your Geofence</h1>
+        <h1
+          className="text-white text-center mb-2"
+          style={{ fontWeight: 700, fontSize: '2rem' }}
+        >
+          Let's start creating your Geofence
+        </h1>
       
       {/* Tutorial Content */}
       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8 max-w-md relative z-10">

@@ -18,7 +18,7 @@ export const Welcome: React.FC = () => {
       />
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-sm px-6">
+      <div className="relative z-10 w-full max-w-sm px-6 relative z-10">
         <div className="mb-8">
           <h1
             className="text-white text-center mb-2"

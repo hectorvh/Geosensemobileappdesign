@@ -95,7 +95,12 @@ export const LinkDevices: React.FC = () => {
       
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0 relative z-10">
-        <h3 className="mb-2">Link Your Devices</h3>
+        <h2
+          className="mb-2"
+          style={{ fontWeight: 700, fontSize: '1.4rem' }}
+        >
+          Link Your Devices
+        </h2>
         <p className="text-sm opacity-90">Assign GPS trackers to each animal</p>
       </div>
 

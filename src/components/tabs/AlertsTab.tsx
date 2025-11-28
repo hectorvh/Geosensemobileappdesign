@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useApp, Alert } from '../../contexts/AppContext';
 import { AlertTriangle, Battery, Activity, Clock } from 'lucide-react';
+import welcomeImage from '@/assets/20250621-P1300259-2-3.jpg';
 
 export const AlertsTab: React.FC = () => {
   const { devices, alerts, setAlerts, alertSettings } = useApp();

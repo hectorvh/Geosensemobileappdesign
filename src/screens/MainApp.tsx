@@ -22,8 +22,13 @@ export const MainApp: React.FC = () => {
   return (
     <div className="mobile-screen flex flex-col">
       {/* Header */}
-      <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center justify-between shrink-0">
-        <h2>GeoSense</h2>
+      <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center justify-between shrink-0 relative">
+        <h2
+          className="mb-2"
+          style={{ fontWeight: 700, fontSize: '1.4rem' }}
+        >
+          GeoSense
+        </h2>
         <button
           onClick={() => navigate('/settings')}
           className="p-2 hover:bg-[var(--pine-green)] rounded-lg transition-colors"
@@ -33,7 +38,7 @@ export const MainApp: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
         {activeTab === 'home' && <HomeTab />}
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'alerts' && <AlertsTab />}
@@ -41,7 +46,7 @@ export const MainApp: React.FC = () => {
       </div>
 
       {/* Bottom Tab Navigation */}
-      <div className="bg-white border-t border-gray-200 shrink-0">
+      <div className="bg-white border-t border-gray-200 shrink-0 relative">
         <div className="flex items-center justify-around p-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;

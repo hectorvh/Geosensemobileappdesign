@@ -5,6 +5,7 @@ import { GeoInput } from '../components/GeoInput';
 import { LeafletMap } from '../components/LeafletMap';
 import { useApp } from '../contexts/AppContext';
 import { MapPin, Navigation, X, Trash2 } from 'lucide-react';
+import welcomeImage from '@/assets/20250621-P1300259-2-3.jpg';
 
 export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
@@ -112,14 +113,26 @@ export const DrawGeofence: React.FC = () => {
 
   return (
     <div className="mobile-screen flex flex-col">
+      {/* Background Image Overlay */}
+            <div 
+              className="absolute inset-0 bg-cover bg-center opacity-20"
+              style={{
+                backgroundImage: `url(${welcomeImage})`
+              }}
+            />
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0">
-        <h3 className="mb-3">Draw Your Geofence</h3>
+        <h2
+          className="mb-2"
+          style={{ fontWeight: 700, fontSize: '1.4rem' }}
+        >
+          Draw Your Geofence
+        </h2>
         <p className="text-sm opacity-90">Create safe zones on the map for your livestock.</p>
       </div>
 
       {/* Search Controls */}
-      <div className="bg-[var(--pine-green)] p-3 space-y-2 shrink-0">
+      <div className="bg-[var(--pine-green)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
           <GeoInput
             type="text"
@@ -146,7 +159,7 @@ export const DrawGeofence: React.FC = () => {
 
       {/* Drawing Instructions */}
       {isDrawing && (
-        <div className="bg-[var(--high-yellow)] text-[var(--deep-forest)] p-2 text-center text-sm shrink-0">
+        <div className="bg-[var(--high-yellow)] text-[var(--deep-forest)] p-2 text-center text-sm shrink-0 relative z-10">
           Click on the map to add points. Need at least 3 points.
         </div>
       )}
@@ -205,17 +218,17 @@ export const DrawGeofence: React.FC = () => {
       </div>
 
       {/* Bottom Buttons */}
-      <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0">
+      <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
           <GeoButton 
-            variant="primary" 
+            variant="outline" 
             onClick={handleSaveGeofence}
             className="flex-1"
           >
             Save geofence
           </GeoButton>
           <GeoButton 
-            variant="secondary" 
+            variant="primary" 
             onClick={() => navigate('/link-devices')}
             className="flex-1"
           >

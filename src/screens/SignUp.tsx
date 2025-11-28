@@ -43,8 +43,13 @@ export const SignUp: React.FC = () => {
       />
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-md px-6">
-        <h2 className="text-white text-center mb-8">Create Account</h2>
+      <div className="relative z-10 w-full max-w-md px-6 relative z-10">
+          <h1
+            className="text-white text-center mb-2"
+            style={{ fontWeight: 700, fontSize: '3rem' }}
+          >
+            Create new account
+          </h1>
         
         <form onSubmit={handleSignUp} className="space-y-4">
           <GeoInput

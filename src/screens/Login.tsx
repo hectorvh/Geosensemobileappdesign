@@ -38,10 +38,10 @@ export const Login: React.FC = () => {
       />
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-sm px-6">
+      <div className="relative z-10 w-full max-w-sm px-6 relative z-10">
           <h1
             className="text-white text-center mb-2"
-            style={{ fontWeight: 700, fontSize: '4rem' }}
+            style={{ fontWeight: 700, fontSize: '3rem' }}
           >
             Log In
           </h1>

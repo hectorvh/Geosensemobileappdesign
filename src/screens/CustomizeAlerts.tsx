@@ -22,7 +22,12 @@ export const CustomizeAlerts: React.FC = () => {
       
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0 relative z-10">
-        <h3 className="mb-2">Customize Your Alerts</h3>
+        <h2
+          className="mb-2"
+          style={{ fontWeight: 700, fontSize: '1.4rem' }}
+        >
+          Customize Your Alerts
+        </h2>
         <p className="text-sm opacity-90">Choose which notifications you want to receive</p>
       </div>
 
