@@ -96,18 +96,18 @@ export const CustomizeAlerts: React.FC = () => {
       <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
           <GeoButton 
-            variant="primary" 
-            onClick={() => navigate('/main')}
-            className="flex-1"
-          >
-            Next
-          </GeoButton>
-          <GeoButton 
             variant="outline" 
             onClick={() => navigate('/link-devices')}
             className="flex-1"
           >
             Back
+          </GeoButton>
+          <GeoButton 
+            variant="primary" 
+            onClick={() => navigate('/main')}
+            className="flex-1"
+          >
+            Next
           </GeoButton>
         </div>
       </div>

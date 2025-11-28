@@ -29,8 +29,8 @@ export const LinkDevices: React.FC = () => {
     }
 
     // Generate random position near center for demo
-    const lat = 51.505 + (Math.random() - 0.5) * 0.1;
-    const lng = -0.09 + (Math.random() - 0.5) * 0.1;
+    const lat = 52.98569 + (Math.random() - 0.5) * 0.1;
+    const lng = 10.08756 + (Math.random() - 0.5) * 0.1;
 
     if (editingId) {
       updateDevice(editingId, {
@@ -200,18 +200,18 @@ export const LinkDevices: React.FC = () => {
       <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
           <GeoButton 
-            variant="primary" 
-            onClick={() => navigate('/customize-alerts')}
-            className="flex-1"
-          >
-            Next
-          </GeoButton>
-          <GeoButton 
             variant="outline" 
             onClick={() => navigate('/draw-geofence')}
             className="flex-1"
           >
             Back
+          </GeoButton>
+          <GeoButton 
+            variant="primary" 
+            onClick={() => navigate('/customize-alerts')}
+            className="flex-1"
+          >
+            Next
           </GeoButton>
         </div>
       </div>
