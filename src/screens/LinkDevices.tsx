@@ -29,8 +29,8 @@ export const LinkDevices: React.FC = () => {
     }
 
     // Generate random position near center for demo
-    const lat = 52.98569 + (Math.random() - 0.5) * 0.1;
-    const lng = 10.08756 + (Math.random() - 0.5) * 0.1;
+    const lat = 51.969205 + (Math.random() - 0.5) * 0.1;
+    const lng = 7.595761 + (Math.random() - 0.5) * 0.1;
 
     if (editingId) {
       updateDevice(editingId, {
@@ -152,20 +152,20 @@ export const LinkDevices: React.FC = () => {
               />
               <GeoInput
                 type="text"
-                placeholder="Animal Name *"
+                placeholder="Name *"
                 value={formData.animalName}
                 onChange={(e) => setFormData({ ...formData, animalName: e.target.value })}
                 required
               />
               <GeoInput
                 type="number"
-                placeholder="Age (optional)"
+                placeholder="Age Years (optional)"
                 value={formData.age}
                 onChange={(e) => setFormData({ ...formData, age: e.target.value })}
               />
               <GeoInput
                 type="number"
-                placeholder="Weight (optional)"
+                placeholder="Weight kg (optional)"
                 value={formData.weight}
                 onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
               />

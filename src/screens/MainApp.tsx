@@ -23,7 +23,7 @@ export const MainApp: React.FC = () => {
     <div className="mobile-screen flex flex-col">
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center justify-between shrink-0">
-        <h3>GeoSense</h3>
+        <h2>GeoSense</h2>
         <button
           onClick={() => navigate('/settings')}
           className="p-2 hover:bg-[var(--pine-green)] rounded-lg transition-colors"

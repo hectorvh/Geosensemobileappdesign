@@ -10,7 +10,7 @@ export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
   const { user, addGeofence } = useApp();
   const [searchLocation, setSearchLocation] = useState('');
-  const [mapCenter, setMapCenter] = useState<[number, number]>([51.505, -0.09]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([51.969205, 7.595761]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPolygon, setCurrentPolygon] = useState<[number, number][]>([]);
   const [savedPolygon, setSavedPolygon] = useState<[number, number][]>([]);
@@ -35,7 +35,7 @@ export const DrawGeofence: React.FC = () => {
     // Mock geocoding - in production, use Nominatim or another geocoding service
     // For now, set a default location
     alert(`Searching for: ${searchLocation}. Using default location for demo.`);
-    setMapCenter([40.7128, -74.0060]); // New York as example
+    setMapCenter([51.969205, 7.595761]); // Munster as example
   };
 
   const handleStartDrawing = () => {
@@ -163,7 +163,7 @@ export const DrawGeofence: React.FC = () => {
 
         {/* Floating Drawing Controls */}
         {!savedPolygon.length && (
-          <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+          <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
             {!isDrawing ? (
               <button
                 onClick={handleStartDrawing}
