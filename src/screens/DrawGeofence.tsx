@@ -225,7 +225,7 @@ export const DrawGeofence: React.FC = () => {
             onClick={handleSaveGeofence}
             className="flex-1"
           >
-            Save geofence
+            Save Geofence
           </GeoButton>
           <GeoButton 
             variant="primary" 
