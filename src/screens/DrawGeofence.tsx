@@ -155,7 +155,7 @@ export const DrawGeofence: React.FC = () => {
       <div className="flex-1 relative">
         <LeafletMap
           center={mapCenter}
-          zoom={13}
+          zoom={16}
           onMapClick={handleMapClick}
           polygons={polygons}
           className="w-full h-full"
