@@ -4,7 +4,7 @@ import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { useApp, Device } from '../contexts/AppContext';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
-import backgroundImage from '@/assets/P1260790.jpg';
+import backgroundImage from '@/assets/P1260790-2.jpg';
 
 export const LinkDevices: React.FC = () => {
   const navigate = useNavigate();

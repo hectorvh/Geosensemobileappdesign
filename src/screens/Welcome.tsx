@@ -8,6 +8,7 @@ export const Welcome: React.FC = () => {
 
   return (
     <div className="mobile-screen green-gradient-bg flex items-center justify-center relative">
+
       {/* Background Image Overlay */}
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-20"
@@ -17,24 +18,29 @@ export const Welcome: React.FC = () => {
       />
       
       {/* Content */}
-      <div className="relative z-10 text-center px-12 space-y-4 max-w-sm">
-        <div className="mb-16">
-          <h1 className="text-white" style={{ fontWeight: 700 }}>GeoSense</h1>
-          <p className="text-white mt-2" style={{ fontWeight: 300 }}>Smart livestock monitoring & geofencing</p>
+      <div className="relative z-10 w-full max-w-sm px-6">
+        <div className="mb-8">
+          <h1
+            className="text-white text-center mb-2"
+            style={{ fontWeight: 700, fontSize: '4rem' }}
+          >
+            GeoSense
+          </h1>
+          <p className="text-white text-center text-xl font-light">Smart livestock monitoring & geofencing</p>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 pt-20">
           <GeoButton 
             variant="primary" 
             onClick={() => navigate('/login')}
-            className="w-full max-w-xs"
+            className="w-full max-w"
           >
             Log in
           </GeoButton>
           
           <GeoButton 
-            variant="outline" 
+            variant="secondary" 
             onClick={() => navigate('/signup')}
-            className="w-full max-w-xs"
+            className="w-full max-w"
           >
             Sign up
           </GeoButton>

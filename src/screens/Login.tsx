@@ -37,8 +37,13 @@ export const Login: React.FC = () => {
       />
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-md px-6">
-        <h2 className="text-white text-center mb-8">Log In</h2>
+      <div className="relative z-10 w-full max-w-sm px-6">
+          <h1
+            className="text-white text-center mb-2"
+            style={{ fontWeight: 700, fontSize: '4rem' }}
+          >
+            Log In
+          </h1>
         
         <form onSubmit={handleLogin} className="space-y-4">
           <GeoInput
@@ -57,7 +62,7 @@ export const Login: React.FC = () => {
             required
           />
           
-          <div className="space-y-3 pt-4">
+          <div className="space-y-4 pt-4">
             <GeoButton 
               type="submit"
               variant="primary" 

@@ -21,7 +21,7 @@ export const GeoButton: React.FC<GeoButtonProps> = ({
   
   const variantStyles = {
     primary: 'bg-[var(--grass-green)] text-white hover:bg-[var(--pine-green)]',
-    secondary: 'bg-[var(--accent-aqua)] text-white hover:bg-[var(--pine-green)]',
+    secondary: 'bg-[var(--deep-forest)] text-white hover:bg-[var(--pine-green)]',
     outline: 'bg-transparent border-2 border-white text-white hover:bg-white/10',
   };
 

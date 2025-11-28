@@ -4,7 +4,7 @@ import { GeoButton } from '../components/GeoButton';
 import { useApp } from '../contexts/AppContext';
 import { Switch } from '../components/ui/switch';
 import { AlertTriangle, Battery, Activity } from 'lucide-react';
-import backgroundImage from '@/assets/P1260790.jpg';
+import backgroundImage from '@/assets/P1260790-2.jpg';
 
 export const CustomizeAlerts: React.FC = () => {
   const navigate = useNavigate();
