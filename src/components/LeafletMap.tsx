@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import L from 'leaflet@1.9.4';
+import L from 'leaflet';
 
 interface MapProps {
   center: [number, number];
