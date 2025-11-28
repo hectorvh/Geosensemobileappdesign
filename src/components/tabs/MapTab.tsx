@@ -19,7 +19,7 @@ export const MapTab: React.FC = () => {
     if (devices.length > 0) {
       return [devices[0].lat, devices[0].lng];
     }
-    return [51.505, -0.09];
+    return [51.969209, 7.595595];
   };
 
   const handleDeleteGeofence = () => {

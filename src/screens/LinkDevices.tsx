@@ -29,8 +29,8 @@ export const LinkDevices: React.FC = () => {
     }
 
     // Generate random position near center for demo
-    const lat = 51.969205 + (Math.random() - 0.5) * 0.1;
-    const lng = 7.595761 + (Math.random() - 0.5) * 0.1;
+    const lat = 51.969209 + (Math.random() - 0.5) * 0.1;
+    const lng = 7.595595 + (Math.random() - 0.5) * 0.1;
 
     if (editingId) {
       updateDevice(editingId, {
