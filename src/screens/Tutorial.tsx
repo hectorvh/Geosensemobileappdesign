@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { MapPin, Smartphone, Bell } from 'lucide-react';
-import backgroundImage from '@/assets/P1260790-2.jpg';
+import backgroundImage from '@/assets/20250621-P1300279.jpg';
 
 export const Tutorial: React.FC = () => {
   const navigate = useNavigate();
