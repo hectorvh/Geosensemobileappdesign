@@ -4,21 +4,30 @@ import { GeoButton } from '../components/GeoButton';
 import { useApp } from '../contexts/AppContext';
 import { Switch } from '../components/ui/switch';
 import { AlertTriangle, Battery, Activity } from 'lucide-react';
+import backgroundImage from '@/assets/P1260790.jpg';
 
 export const CustomizeAlerts: React.FC = () => {
   const navigate = useNavigate();
   const { alertSettings, setAlertSettings } = useApp();
 
   return (
-    <div className="mobile-screen flex flex-col bg-[var(--pine-green)]">
+    <div className="mobile-screen flex flex-col bg-[var(--pine-green)] relative">
+      {/* Background Image Overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none"
+        style={{
+          backgroundImage: `url(${backgroundImage})`
+        }}
+      />
+      
       {/* Header */}
-      <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0">
+      <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0 relative z-10">
         <h3 className="mb-2">Customize Your Alerts</h3>
         <p className="text-sm opacity-90">Choose which notifications you want to receive</p>
       </div>
 
       {/* Alert Settings */}
-      <div className="flex-1 p-4 space-y-4">
+      <div className="flex-1 p-4 space-y-4 relative z-10">
         {/* Out of Range */}
         <div className="bg-white/90 rounded-lg p-4">
           <div className="flex items-start justify-between gap-3">
@@ -84,7 +93,7 @@ export const CustomizeAlerts: React.FC = () => {
       </div>
 
       {/* Bottom Buttons */}
-      <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0">
+      <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
           <GeoButton 
             variant="primary" 

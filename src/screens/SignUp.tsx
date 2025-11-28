@@ -35,7 +35,7 @@ export const SignUp: React.FC = () => {
     <div className="mobile-screen green-gradient-bg flex items-center justify-center relative">
       {/* Background Image Overlay */}
       <div 
-        className="absolute inset-0 bg-cover bg-center opacity-30"
+        className="absolute inset-0 bg-cover bg-center opacity-20"
         style={{
           backgroundImage: `url('/src/assets/20250621-P1300259-2-3.jpg')`
         }}

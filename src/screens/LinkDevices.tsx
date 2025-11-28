@@ -4,6 +4,7 @@ import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { useApp, Device } from '../contexts/AppContext';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
+import backgroundImage from '@/assets/P1260790.jpg';
 
 export const LinkDevices: React.FC = () => {
   const navigate = useNavigate();
@@ -83,15 +84,23 @@ export const LinkDevices: React.FC = () => {
   };
 
   return (
-    <div className="mobile-screen flex flex-col bg-[var(--pine-green)]">
+    <div className="mobile-screen flex flex-col bg-[var(--pine-green)] relative">
+      {/* Background Image Overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none"
+        style={{
+          backgroundImage: `url(${backgroundImage})`
+        }}
+      />
+      
       {/* Header */}
-      <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0">
+      <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0 relative z-10">
         <h3 className="mb-2">Link Your Devices</h3>
         <p className="text-sm opacity-90">Assign GPS trackers to each animal</p>
       </div>
 
       {/* Device List & Form */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 relative z-10">
         {/* Existing Devices */}
         {devices.map((device) => (
           <div key={device.id} className="bg-white/90 rounded-lg p-3 flex items-center justify-between">
@@ -188,7 +197,7 @@ export const LinkDevices: React.FC = () => {
       </div>
 
       {/* Bottom Buttons */}
-      <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0">
+      <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
           <GeoButton 
             variant="primary" 
@@ -207,5 +216,5 @@ export const LinkDevices: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+    );
 };

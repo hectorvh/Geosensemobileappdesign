@@ -29,7 +29,7 @@ const AppContent: React.FC = () => {
       const mockDevices = [
         {
           id: 'GPS001',
-          animalName: 'Bessie',
+          animalName: 'Cow Bella',
           age: 3,
           weight: 450,
           batchId: 'A1',
@@ -78,7 +78,7 @@ const AppContent: React.FC = () => {
       ];
 
       // Only set if devices are empty (first time initialization)
-      setDevices((prev) => prev.length === 0 ? mockDevices : prev);
+      setDevices(mockDevices);
     }
   }, [user]);
 

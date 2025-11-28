@@ -1028,6 +1028,10 @@
     opacity: .3;
   }
 
+  .opacity-20 {
+    opacity: .2;
+  }
+
   .opacity-90 {
     opacity: .9;
   }
