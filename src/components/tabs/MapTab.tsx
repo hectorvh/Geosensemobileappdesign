@@ -103,7 +103,7 @@ export const MapTab: React.FC = () => {
       {/* Map */}
       <LeafletMap
         center={getMapCenter()}
-        zoom={13}
+        zoom={20}
         polygons={polygons}
         markers={markers}
         className="w-full h-full"
