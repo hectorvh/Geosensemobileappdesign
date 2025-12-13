@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as turf from '@turf/turf';
+import type { Feature, Polygon, MultiPolygon } from "geojson";
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { LeafletMap } from '../components/LeafletMap';
@@ -91,13 +92,47 @@ export const DrawGeofence: React.FC = () => {
     (async () => {
       try {
         const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:4000';
+        //const payload = {
+        //  name: 'My Geofence',
+        //  userId: user.id,
+        //  boundary_inner: savedPolygon,
+        //  boundary_outer: outerPolygon.length ? outerPolygon : null,
+        //  buffer_m: bufferMeters,
+        //};
+
+        // Convert [lat,lng][] -> GeoJSON Polygon (GeoJSON uses [lng,lat])
+        const ring: number[][] = savedPolygon.map(([lat, lng]) => [lng, lat]);
+
+        // ensure closed ring
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]]);
+
+        const innerFeature = turf.polygon([ring]);
+
+        // If you still want to send outer to backend (optional)
+        let outerGeom: any = null;
+        if (bufferMeters && bufferMeters > 0) {
+          const buffered = turf.buffer(innerFeature, bufferMeters, { units: "meters" }) as any;
+          const g = buffered?.geometry;
+
+          if (g?.type === "Polygon") outerGeom = g;
+          else if (g?.type === "MultiPolygon") {
+            // take first polygon (simple approach)
+            outerGeom = { type: "Polygon", coordinates: g.coordinates[0] };
+          }
+        } else {
+          outerGeom = innerFeature.geometry; // no buffer => same as inner
+        }
+
         const payload = {
-          name: 'My Geofence',
+          name: "My Geofence",
           userId: user.id,
-          boundary_inner: savedPolygon,
-          boundary_outer: outerPolygon.length ? outerPolygon : null,
+          boundary_inner: innerFeature.geometry, // ✅ GeoJSON Polygon
+          boundary_outer: outerGeom,            // ✅ GeoJSON Polygon (or set to null if you don’t need it)
           buffer_m: bufferMeters,
         };
+
 
         const res = await fetch(`${apiBase}/api/geofences`, {
           method: 'POST',
@@ -185,7 +220,21 @@ export const DrawGeofence: React.FC = () => {
         return;
       }
       // take first ring
-      const coords = buffered.geometry.coordinates[0] as number[][];
+      //const coords = buffered.geometry.coordinates[0] as number[][];
+      const geom: any = buffered.geometry;
+
+      // Polygon -> coordinates[0] is the outer ring
+      // MultiPolygon -> coordinates[0][0] is the outer ring of first polygon
+      const coords: number[][] | null =
+        geom?.type === "Polygon" ? geom.coordinates[0]
+        : geom?.type === "MultiPolygon" ? geom.coordinates[0][0]
+        : null;
+
+      if (!coords) {
+        setOuterPolygon([]);
+        return;
+      }
+
       const latlngs: [number, number][] = coords.map((c) => [c[1], c[0]]);
       setOuterPolygon(latlngs);
     } catch (err) {

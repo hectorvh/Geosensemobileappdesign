@@ -34,18 +34,74 @@ app.get('/api/health', async (req, res) => {
 app.post('/api/geofences', async (req, res) => {
   try {
     const { name, userId, boundary_inner, boundary_outer, buffer_m } = req.body;
-    if (!boundary_inner || !Array.isArray(boundary_inner) || boundary_inner.length < 3) {
-      return res.status(400).json({ error: 'boundary_inner must be an array with at least 3 points' });
+    //if (!boundary_inner || !Array.isArray(boundary_inner) || boundary_inner.length < 3) {
+    //  return res.status(400).json({ error: 'boundary_inner must be an array with at least 3 points' });
+    //}
+    // Accept GeoJSON Polygon OR old [[lat,lng],...] format
+    let polygonGeoJSON = null;
+
+    // NEW: GeoJSON Polygon
+    if (boundary_inner && boundary_inner.type === 'Polygon' && Array.isArray(boundary_inner.coordinates)) {
+      const ring = boundary_inner.coordinates?.[0];
+      // GeoJSON ring must be closed -> at least 4 points
+      if (!Array.isArray(ring) || ring.length < 4) {
+        return res.status(400).json({ error: 'boundary_inner GeoJSON Polygon must have a closed ring (>= 4 points)' });
+      }
+      polygonGeoJSON = boundary_inner;
+    }
+    // OLD: [[lat,lng], ...]
+    else if (Array.isArray(boundary_inner)) {
+      if (boundary_inner.length < 3) {
+        return res.status(400).json({ error: 'boundary_inner must have at least 3 points' });
+      }
+      const ring = boundary_inner.map(([lat, lng]) => [lng, lat]); // -> [lng,lat]
+      const first = ring[0], last = ring[ring.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+      polygonGeoJSON = { type: 'Polygon', coordinates: [ring] };
+    } else {
+      return res.status(400).json({ error: 'boundary_inner must be a GeoJSON Polygon or an array of points' });
     }
 
-    const text = `INSERT INTO geofences(name, user_id, boundary_inner, boundary_outer, buffer_m) VALUES($1, $2, $3, $4, $5) RETURNING id, name, user_id AS "userId", boundary_inner AS "boundaryInner", boundary_outer AS "boundaryOuter", buffer_m AS "bufferM", created_at AS "createdAt"`;
-    const values = [
-      name || 'Geofence',
-      userId || null,
-      JSON.stringify(boundary_inner),
-      boundary_outer ? JSON.stringify(boundary_outer) : null,
-      buffer_m || 0,
-    ];
+    //const text = `INSERT INTO geofences(name, user_id, boundary_inner, boundary_outer, buffer_m) VALUES($1, $2, $3, $4, $5) RETURNING id, name, user_id AS "userId", boundary_inner AS "boundaryInner", boundary_outer AS "boundaryOuter", buffer_m AS "bufferM", created_at AS "createdAt"`;
+    //const values = [
+    //  name || 'Geofence',
+    //  userId || null,
+    //  JSON.stringify(boundary_inner),
+    //  boundary_outer ? JSON.stringify(boundary_outer) : null,
+    //  buffer_m || 0,
+    //];
+
+    const geojsonText = JSON.stringify(polygonGeoJSON);
+
+    const text = `
+      INSERT INTO geofences (name, user_id, inner_geom, outer_geom, buffer_m)
+      VALUES (
+        $1,
+        $2,
+        ST_SetSRID(ST_GeomFromGeoJSON($3), 4326),
+        CASE
+          WHEN $4::int > 0
+          THEN ST_Buffer(
+                ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)::geography,
+                $4
+              )::geometry
+          ELSE ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)
+        END,
+        $4
+      )
+      RETURNING
+        id,
+        name,
+        user_id AS "userId",
+        ST_AsGeoJSON(inner_geom)::json AS "boundaryInner",
+        ST_AsGeoJSON(outer_geom)::json AS "boundaryOuter",
+        buffer_m AS "bufferM",
+        created_at AS "createdAt"
+    `;
+
+    const values = [name || "Geofence", userId, geojsonText, buffer_m || 0];
+
+
     const result = await pool.query(text, values);
     res.json(result.rows[0]);
   } catch (err) {
@@ -56,8 +112,22 @@ app.post('/api/geofences', async (req, res) => {
 
 app.get('/api/geofences', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, user_id AS "userId", boundary_inner AS "boundaryInner", boundary_outer AS "boundaryOuter", buffer_m AS "bufferM", created_at AS "createdAt" FROM geofences ORDER BY created_at DESC');
+    //const result = await pool.query('SELECT id, name, user_id AS "userId", boundary_inner AS "boundaryInner", boundary_outer AS "boundaryOuter", buffer_m AS "bufferM", created_at AS "createdAt" FROM geofences ORDER BY created_at DESC');
+    //res.json(result.rows);
+    const result = await pool.query(`
+      SELECT
+        id,
+        name,
+        user_id AS "userId",
+        ST_AsGeoJSON(inner_geom)::json AS "boundaryInner",
+        ST_AsGeoJSON(ST_Buffer(inner_geom::geography, buffer_m)::geometry)::json AS "boundaryOuter",
+        buffer_m AS "bufferM",
+        created_at AS "createdAt"
+      FROM geofences
+      ORDER BY created_at DESC
+    `);
     res.json(result.rows);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

@@ -24,7 +24,8 @@ npm install
 
 ```bash
 createdb -h localhost -U postgres geosense
-psql -h localhost -U postgres -d geosense -f server/init.sql
+psql -h localhost -U postgres -d geosense -f ./init.sql
+
 ```
 
 3. Start server
