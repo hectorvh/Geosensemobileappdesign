@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as turf from '@turf/turf';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { LeafletMap } from '../components/LeafletMap';
 import { useApp } from '../contexts/AppContext';
 import { MapPin, Navigation, X, Trash2 } from 'lucide-react';
 import welcomeImage from '../assets/20250621-P1300259-2-3.jpg';
+
 
 export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +17,8 @@ export const DrawGeofence: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPolygon, setCurrentPolygon] = useState<[number, number][]>([]);
   const [savedPolygon, setSavedPolygon] = useState<[number, number][]>([]);
+  const [bufferMeters, setBufferMeters] = useState<number>(0);
+  const [outerPolygon, setOuterPolygon] = useState<[number, number][]>([]);
 
   const handleUseCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -56,7 +60,8 @@ export const DrawGeofence: React.FC = () => {
       return;
     }
     setSavedPolygon(currentPolygon);
-    setCurrentPolygon([]); 
+    setCurrentPolygon([]);
+    setBufferMeters(0);
     setIsDrawing(false);
   };
 
@@ -82,14 +87,22 @@ export const DrawGeofence: React.FC = () => {
       return;
     }
 
-    // POST polygon to backend API (see server/) then add to local context
+    // POST polygon + buffer to backend API (see server/) then add to local context
     (async () => {
       try {
         const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:4000';
+        const payload = {
+          name: 'My Geofence',
+          userId: user.id,
+          boundary_inner: savedPolygon,
+          boundary_outer: outerPolygon.length ? outerPolygon : null,
+          buffer_m: bufferMeters,
+        };
+
         const res = await fetch(`${apiBase}/api/geofences`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: 'My Geofence', userId: user.id, coordinates: savedPolygon }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -99,10 +112,12 @@ export const DrawGeofence: React.FC = () => {
         const newGeofence = {
           id: saved.id?.toString() || Date.now().toString(),
           name: saved.name || 'My Geofence',
-          coordinates: saved.coordinates || savedPolygon,
+          coordinates: saved.boundaryInner || savedPolygon,
+          boundaryOuter: saved.boundaryOuter || outerPolygon,
+          buffer_m: saved.bufferM || bufferMeters,
           userId: saved.userId || user.id,
-        };
-        addGeofence(newGeofence);
+        } as any;
+        addGeofence({ id: newGeofence.id, name: newGeofence.name, coordinates: newGeofence.coordinates, userId: newGeofence.userId });
         navigate('/link-devices');
       } catch (error: any) {
         console.error('Save geofence failed', error);
@@ -121,18 +136,63 @@ export const DrawGeofence: React.FC = () => {
     });
   }
   if (savedPolygon.length > 0) {
+    // inner/original polygon
     polygons.push({
       coordinates: savedPolygon,
       color: '#195A3A',
       fillColor: '#78A64A',
       fillOpacity: 0.4,
     });
+    // outer/buffered polygon preview
+    if (outerPolygon.length > 0) {
+      polygons.push({
+        coordinates: outerPolygon,
+        color: '#236A5E',
+        fillColor: '#78A64A',
+        fillOpacity: 0.15,
+      });
+    }
   }
   const markers = (isDrawing ? currentPolygon : savedPolygon).map((p, i) => ({
     position: p as [number, number],
     color: '#F59E0B',
     label: `P${i + 1}`,
   }));
+
+  // Compute buffered (outer) polygon whenever savedPolygon or bufferMeters changes
+  useEffect(() => {
+    if (!savedPolygon || savedPolygon.length < 3) {
+      setOuterPolygon([]);
+      return;
+    }
+
+    try {
+      // Turf expects [lng, lat]
+      const ring = savedPolygon.map((p) => [p[1], p[0]]);
+      // ensure closed
+      if (ring.length && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+        ring.push(ring[0]);
+      }
+      const poly = turf.polygon([ring]);
+      if (!bufferMeters || bufferMeters === 0) {
+        // no buffer -> outer equals inner (copy)
+        setOuterPolygon(savedPolygon.slice());
+        return;
+      }
+      const buffered = turf.buffer(poly, bufferMeters, { units: 'meters' });
+      if (!buffered || !buffered.geometry || !buffered.geometry.coordinates) {
+        setOuterPolygon([]);
+        return;
+      }
+      // take first ring
+      const coords = buffered.geometry.coordinates[0] as number[][];
+      const latlngs: [number, number][] = coords.map((c) => [c[1], c[0]]);
+      setOuterPolygon(latlngs);
+    } catch (err) {
+      console.error('Buffer calculation failed', err);
+      setOuterPolygon([]);
+    }
+  }, [savedPolygon, bufferMeters]);
 
   return (
     <div className="mobile-screen flex flex-col">
@@ -230,7 +290,7 @@ export const DrawGeofence: React.FC = () => {
 
         {/* Clear button when polygon is saved */}
         {savedPolygon.length > 0 && (
-          <div className="absolute top-4 left-4 z-[1000]">
+          <div className="absolute top-4 right-4 z-[1000]">
             <button
               onClick={handleClearPolygon}
               className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
@@ -243,6 +303,23 @@ export const DrawGeofence: React.FC = () => {
 
       {/* Bottom Buttons */}
       <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
+        {savedPolygon.length > 0 && (
+          <div className="bg-[var(--pine-green)] p-2 rounded-lg text-white space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm">Buffer (meters)</div>
+              <div className="text-sm font-semibold">{bufferMeters} m</div>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={50}
+              step={1}
+              value={bufferMeters}
+              onChange={(e) => setBufferMeters(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        )}
         <div className="flex gap-2">
           <GeoButton 
             variant="outline" 

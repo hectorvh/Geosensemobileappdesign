@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -32,13 +33,19 @@ app.get('/api/health', async (req, res) => {
 
 app.post('/api/geofences', async (req, res) => {
   try {
-    const { name, userId, coordinates } = req.body;
-    if (!coordinates || !Array.isArray(coordinates) || coordinates.length < 3) {
-      return res.status(400).json({ error: 'coordinates must be an array with at least 3 points' });
+    const { name, userId, boundary_inner, boundary_outer, buffer_m } = req.body;
+    if (!boundary_inner || !Array.isArray(boundary_inner) || boundary_inner.length < 3) {
+      return res.status(400).json({ error: 'boundary_inner must be an array with at least 3 points' });
     }
 
-    const text = `INSERT INTO geofences(name, user_id, coordinates) VALUES($1, $2, $3) RETURNING id, name, user_id AS "userId", coordinates, created_at AS "createdAt"`;
-    const values = [name || 'Geofence', userId || null, JSON.stringify(coordinates)];
+    const text = `INSERT INTO geofences(name, user_id, boundary_inner, boundary_outer, buffer_m) VALUES($1, $2, $3, $4, $5) RETURNING id, name, user_id AS "userId", boundary_inner AS "boundaryInner", boundary_outer AS "boundaryOuter", buffer_m AS "bufferM", created_at AS "createdAt"`;
+    const values = [
+      name || 'Geofence',
+      userId || null,
+      JSON.stringify(boundary_inner),
+      boundary_outer ? JSON.stringify(boundary_outer) : null,
+      buffer_m || 0,
+    ];
     const result = await pool.query(text, values);
     res.json(result.rows[0]);
   } catch (err) {
@@ -49,7 +56,7 @@ app.post('/api/geofences', async (req, res) => {
 
 app.get('/api/geofences', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, user_id AS "userId", coordinates, created_at AS "createdAt" FROM geofences ORDER BY created_at DESC');
+    const result = await pool.query('SELECT id, name, user_id AS "userId", boundary_inner AS "boundaryInner", boundary_outer AS "boundaryOuter", buffer_m AS "bufferM", created_at AS "createdAt" FROM geofences ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
     console.error(err);

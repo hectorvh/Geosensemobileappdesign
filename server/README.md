@@ -23,8 +23,8 @@ npm install
 2. Create database and run init SQL (example using psql):
 
 ```bash
-createdb geosense
-psql -d geosense -f init.sql
+createdb -h localhost -U postgres geosense
+psql -h localhost -U postgres -d geosense -f server/init.sql
 ```
 
 3. Start server
