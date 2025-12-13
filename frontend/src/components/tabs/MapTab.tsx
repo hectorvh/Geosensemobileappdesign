@@ -10,11 +10,50 @@ export const MapTab: React.FC = () => {
   const { devices, geofences, removeGeofence } = useApp();
   const [showRetry, setShowRetry] = useState(false);
 
+  type LatLng = [number, number];
+
+  function toLatLngArray(input: any): LatLng[] {
+    if (!input) return [];
+
+    // Si viene como string JSON
+    if (typeof input === "string") {
+      try { input = JSON.parse(input); } catch { return []; }
+    }
+
+    // Si viene como GeoJSON Feature
+    if (input?.type === "Feature" && input?.geometry) input = input.geometry;
+
+    // GeoJSON Polygon: coordinates[0] es el anillo exterior en [lng,lat]
+    if (input?.type === "Polygon" && Array.isArray(input.coordinates)) {
+      const ring = input.coordinates[0] ?? [];
+      return ring.map(([lng, lat]: number[]) => [lat, lng]);
+    }
+
+    // GeoJSON MultiPolygon: toma el primer polígono/anillo
+    if (input?.type === "MultiPolygon" && Array.isArray(input.coordinates)) {
+      const ring = input.coordinates?.[0]?.[0] ?? [];
+      return ring.map(([lng, lat]: number[]) => [lat, lng]);
+    }
+
+    // Formato viejo: [[lat,lng], ...]
+    if (Array.isArray(input) && input.length && Array.isArray(input[0])) {
+      return input.map((p: any) => [Number(p[0]), Number(p[1])] as LatLng);
+    }
+
+    return [];
+  }
+
+
+
   // Calculate map center based on geofence or devices
   const getMapCenter = (): [number, number] => {
-    if (geofences.length > 0 && geofences[0].coordinates.length > 0) {
-      const coords = geofences[0].coordinates[0];
-      return coords;
+    //if (geofences.length > 0 && geofences[0].coordinates.length > 0) {
+    //  const coords = geofences[0].coordinates[0];
+    //  return coords;
+    //}
+    if (geofences.length > 0) {
+      const coords = toLatLngArray(geofences[0].coordinates);
+      if (coords.length > 0) return coords[0];
     }
     if (devices.length > 0) {
       return [devices[0].lat, devices[0].lng];
@@ -72,24 +111,49 @@ export const MapTab: React.FC = () => {
   };
 
   // Prepare polygons for the map
+  //const polygons = [];
+  //if (geofences.length > 0) {
+  //  const geofence = geofences[0];
+    // Buffer zone
+  //  polygons.push({
+  //    coordinates: getBufferPolygon(geofence.coordinates),
+  //    color: '#3FB7FF',
+  //    fillColor: '#3FB7FF',
+  //    fillOpacity: 0.1,
+  //  });
+    // Main geofence
+  //  polygons.push({
+  //    coordinates: geofence.coordinates,
+  //    color: '#78A64A',
+  //    fillColor: '#78A64A',
+  //    fillOpacity: 0.3,
+  //  });
+  //}
+
   const polygons = [];
   if (geofences.length > 0) {
     const geofence = geofences[0];
-    // Buffer zone
-    polygons.push({
-      coordinates: getBufferPolygon(geofence.coordinates),
-      color: '#3FB7FF',
-      fillColor: '#3FB7FF',
-      fillOpacity: 0.1,
-    });
-    // Main geofence
-    polygons.push({
-      coordinates: geofence.coordinates,
-      color: '#78A64A',
-      fillColor: '#78A64A',
-      fillOpacity: 0.3,
-    });
+    const coords = toLatLngArray(geofence.coordinates);
+
+    if (coords.length >= 3) {
+      // Buffer zone (simple 10% bigger)
+      polygons.push({
+        coordinates: getBufferPolygon(coords),
+        color: '#3FB7FF',
+        fillColor: '#3FB7FF',
+        fillOpacity: 0.1,
+      });
+
+      // Main geofence
+      polygons.push({
+        coordinates: coords,
+        color: '#78A64A',
+        fillColor: '#78A64A',
+        fillOpacity: 0.3,
+      });
+    }
   }
+
 
   // Prepare markers
   //const markers = devices.map((device) => ({

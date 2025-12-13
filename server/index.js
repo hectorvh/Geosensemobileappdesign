@@ -56,7 +56,8 @@ app.post('/api/geofences', async (req, res) => {
       }
       const ring = boundary_inner.map(([lat, lng]) => [lng, lat]); // -> [lng,lat]
       const first = ring[0], last = ring[ring.length - 1];
-      if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+      //if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+      if (first[0] !== last[0] || first[1] !== last[1]) ring.push(first);
       polygonGeoJSON = { type: 'Polygon', coordinates: [ring] };
     } else {
       return res.status(400).json({ error: 'boundary_inner must be a GeoJSON Polygon or an array of points' });
