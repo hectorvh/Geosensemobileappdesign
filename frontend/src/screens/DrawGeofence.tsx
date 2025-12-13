@@ -82,15 +82,33 @@ export const DrawGeofence: React.FC = () => {
       return;
     }
 
-    const newGeofence = {
-      id: Date.now().toString(),
-      name: 'My Geofence',
-      coordinates: savedPolygon,
-      userId: user.id,
-    };
-
-    addGeofence(newGeofence);
-    navigate('/link-devices');
+    // POST polygon to backend API (see server/) then add to local context
+    (async () => {
+      try {
+        const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:4000';
+        const res = await fetch(`${apiBase}/api/geofences`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'My Geofence', userId: user.id, coordinates: savedPolygon }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to save geofence');
+        }
+        const saved = await res.json();
+        const newGeofence = {
+          id: saved.id?.toString() || Date.now().toString(),
+          name: saved.name || 'My Geofence',
+          coordinates: saved.coordinates || savedPolygon,
+          userId: saved.userId || user.id,
+        };
+        addGeofence(newGeofence);
+        navigate('/link-devices');
+      } catch (error: any) {
+        console.error('Save geofence failed', error);
+        alert('Unable to save geofence to server: ' + (error?.message || 'unknown error'));
+      }
+    })();
   };
 
   const polygons = [];
