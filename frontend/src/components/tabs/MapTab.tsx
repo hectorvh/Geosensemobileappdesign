@@ -92,11 +92,15 @@ export const MapTab: React.FC = () => {
   }
 
   // Prepare markers
-  const markers = devices.map((device) => ({
-    position: [device.lat, device.lng] as [number, number],
-    color: getMarkerColor(device.status),
-    label: `${device.animalName} - ${getStatusText(device.status)}`,
-  }));
+  //const markers = devices.map((device) => ({
+  //  position: [device.lat, device.lng] as [number, number],
+  //  color: getMarkerColor(device.status),
+  //  label: `${device.animalName} - ${getStatusText(device.status)}`,
+  //}));
+
+
+
+
 
   return (
     <div className="h-full relative">
@@ -105,7 +109,6 @@ export const MapTab: React.FC = () => {
         center={getMapCenter()}
         zoom={20}
         polygons={polygons}
-        markers={markers}
         className="w-full h-full"
       />
 

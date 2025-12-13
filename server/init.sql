@@ -6,3 +6,4 @@ CREATE TABLE IF NOT EXISTS geofences (
   coordinates JSONB NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS geofences_user_id_idx ON geofences(user_id);

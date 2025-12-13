@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { LeafletMap } from '../components/LeafletMap';
 import { useApp } from '../contexts/AppContext';
 import { MapPin, Navigation, X, Trash2 } from 'lucide-react';
-import welcomeImage from '@/assets/20250621-P1300259-2-3.jpg';
+import welcomeImage from '../assets/20250621-P1300259-2-3.jpg';
 
 export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
@@ -46,9 +46,8 @@ export const DrawGeofence: React.FC = () => {
   };
 
   const handleMapClick = (lat: number, lng: number) => {
-    if (isDrawing) {
-      setCurrentPolygon([...currentPolygon, [lat, lng]]);
-    }
+    if (!isDrawing) return;
+    setCurrentPolygon((prev) => [...prev, [lat, lng]]);
   };
 
   const handleCompletePolygon = () => {
@@ -57,6 +56,7 @@ export const DrawGeofence: React.FC = () => {
       return;
     }
     setSavedPolygon(currentPolygon);
+    setCurrentPolygon([]); 
     setIsDrawing(false);
   };
 
@@ -128,6 +128,11 @@ export const DrawGeofence: React.FC = () => {
       fillOpacity: 0.4,
     });
   }
+  const markers = (isDrawing ? currentPolygon : savedPolygon).map((p, i) => ({
+    position: p as [number, number],
+    color: '#F59E0B',
+    label: `P${i + 1}`,
+  }));
 
   return (
     <div className="mobile-screen flex flex-col">
@@ -189,6 +194,7 @@ export const DrawGeofence: React.FC = () => {
           zoom={16}
           onMapClick={handleMapClick}
           polygons={polygons}
+          markers={markers}
           className="w-full h-full"
         />
 

@@ -33,6 +33,8 @@ export const LeafletMap: React.FC<MapProps> = ({
   const polygonLayersRef = useRef<L.Polygon[]>([]);
   const markerLayersRef = useRef<L.CircleMarker[]>([]);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const onMapClickRef = useRef<MapProps["onMapClick"]>(onMapClick);
+
 
   // Initialize map
   useEffect(() => {
@@ -54,11 +56,11 @@ export const LeafletMap: React.FC<MapProps> = ({
     tileLayerRef.current = tileLayer;
 
     // Handle map clicks
-    if (onMapClick) {
+    //if (onMapClick) {
       map.on('click', (e: any) => {
-        onMapClick(e.latlng.lat, e.latlng.lng);
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
       });
-    }
+    //}
 
     mapInstanceRef.current = map;
 
@@ -133,6 +135,11 @@ export const LeafletMap: React.FC<MapProps> = ({
       markerLayersRef.current.push(circleMarker);
     });
   }, [markers]);
+
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
+
 
   return (
     <div
