@@ -5,6 +5,7 @@ interface MapProps {
   center: [number, number];
   zoom: number;
   onMapClick?: (lat: number, lng: number) => void;
+  onZoomChange?: (zoom: number) => void;
   polygons?: Array<{
     coordinates: [number, number][];
     color?: string;
@@ -24,6 +25,7 @@ export const LeafletMap: React.FC<MapProps> = ({
   center,
   zoom,
   onMapClick,
+  onZoomChange,
   polygons = [],
   markers = [],
   className = '',
@@ -34,6 +36,9 @@ export const LeafletMap: React.FC<MapProps> = ({
   const markerLayersRef = useRef<L.CircleMarker[]>([]);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const onMapClickRef = useRef<MapProps["onMapClick"]>(onMapClick);
+  const onZoomChangeRef = useRef<MapProps["onZoomChange"]>(onZoomChange);
+  const currentZoomRef = useRef<number>(zoom);
+  const isUserInteractionRef = useRef<boolean>(false);
 
 
   // Initialize map
@@ -56,11 +61,24 @@ export const LeafletMap: React.FC<MapProps> = ({
     tileLayerRef.current = tileLayer;
 
     // Handle map clicks
-    //if (onMapClick) {
-      map.on('click', (e: any) => {
-        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
-      });
-    //}
+    map.on('click', (e: any) => {
+      onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Track zoom changes from user interaction
+    map.on('zoomend', () => {
+      if (mapInstanceRef.current) {
+        const newZoom = mapInstanceRef.current.getZoom();
+        currentZoomRef.current = newZoom;
+        isUserInteractionRef.current = true;
+        onZoomChangeRef.current?.(newZoom);
+      }
+    });
+
+    // Track drag/pan to detect user interaction
+    map.on('dragend', () => {
+      isUserInteractionRef.current = true;
+    });
 
     mapInstanceRef.current = map;
 
@@ -78,12 +96,39 @@ export const LeafletMap: React.FC<MapProps> = ({
     };
   }, []);
 
-  // Update center and zoom
+  // Update zoom change callback
+  useEffect(() => {
+    onZoomChangeRef.current = onZoomChange;
+  }, [onZoomChange]);
+
+  // Track initial mount
+  const isInitialMountRef = useRef(true);
+  const lastCenterRef = useRef<[number, number]>(center);
+
+  // Update center only (preserve user's zoom level)
   useEffect(() => {
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView(center, zoom);
+      if (isInitialMountRef.current) {
+        // On initial mount, set both center and zoom
+        mapInstanceRef.current.setView(center, zoom);
+        currentZoomRef.current = zoom;
+        lastCenterRef.current = center;
+        isInitialMountRef.current = false;
+      } else {
+        // After initial mount, only update center if it actually changed
+        // Use panTo to preserve zoom level
+        const [lastLat, lastLng] = lastCenterRef.current;
+        const [newLat, newLng] = center;
+        if (Math.abs(lastLat - newLat) > 0.0001 || Math.abs(lastLng - newLng) > 0.0001) {
+          mapInstanceRef.current.panTo(center, { animate: false });
+          lastCenterRef.current = center;
+        }
+      }
     }
   }, [center, zoom]);
+
+  // Don't update zoom after initial mount - let user control it
+  // Zoom is only set on initial mount above
 
   // Update polygons
   useEffect(() => {

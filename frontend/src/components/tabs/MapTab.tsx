@@ -13,6 +13,8 @@ export const MapTab: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showRetry, setShowRetry] = useState(false);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [mapZoom, setMapZoom] = useState<number>(15);
   const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(5000);
   const { geofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
   const { alerts } = useAlerts(user?.id, true);
@@ -52,18 +54,29 @@ export const MapTab: React.FC = () => {
 
 
 
-  // Calculate map center based on geofence or live locations
-  const getMapCenter = (): [number, number] => {
-    if (geofences.length > 0) {
-      const coords = toLatLngArray(geofences[0].boundary_inner);
-      if (coords.length > 0) return coords[0];
+  // Set initial map center only once when data is first loaded
+  React.useEffect(() => {
+    if (mapCenter === null) {
+      // Only set initial center if we don't have one yet
+      if (geofences.length > 0) {
+        const coords = toLatLngArray(geofences[0].boundary_inner);
+        if (coords.length > 0) {
+          setMapCenter(coords[0]);
+          return;
+        }
+      }
+      // Use first live location if available
+      if (locations.length > 0) {
+        setMapCenter([locations[0].lat, locations[0].lng]);
+        return;
+      }
+      // Default center
+      setMapCenter([51.969209, 7.595595]);
     }
-    // Use first live location if available
-    if (locations.length > 0) {
-      return [locations[0].lat, locations[0].lng];
-    }
-    return [51.969209, 7.595595];
-  };
+  }, [geofences, locations, mapCenter]);
+
+  // Use the stored center or default
+  const currentCenter = mapCenter || [51.969209, 7.595595];
 
   const handleDeleteGeofence = async () => {
     if (geofences.length > 0 && confirm('Delete this geofence?')) {
@@ -254,8 +267,9 @@ export const MapTab: React.FC = () => {
 
       {/* Map */}
       <LeafletMap
-        center={getMapCenter()}
-        zoom={locations.length > 0 ? 15 : 20}
+        center={currentCenter}
+        zoom={mapZoom}
+        onZoomChange={setMapZoom}
         polygons={polygons}
         markers={markers}
         className="w-full h-full"
