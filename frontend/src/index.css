@@ -1491,6 +1491,20 @@ html {
   line-height: 1.4;
 }
 
+.custom-popup {
+  font-family: Inter, sans-serif;
+}
+
+.custom-popup strong {
+  font-weight: 600;
+  color: var(--deep-forest);
+}
+
+.custom-popup small {
+  font-size: 12px;
+  color: var(--color-gray-600);
+}
+
 .leaflet-popup-tip-container {
   pointer-events: none;
   width: 40px;

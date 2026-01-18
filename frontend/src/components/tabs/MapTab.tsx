@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { LeafletMap } from '../LeafletMap';
 import { GeoButton } from '../GeoButton';
-import { MapPin, Trash2, Edit } from 'lucide-react';
+import { MapPin, Trash2, Edit, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLiveLocations } from '../../hooks/useLiveLocations';
 
 export const MapTab: React.FC = () => {
   const navigate = useNavigate();
   const { devices, geofences, removeGeofence } = useApp();
   const [showRetry, setShowRetry] = useState(false);
+  const { locations, loading, error } = useLiveLocations(5000); // Poll every 5 seconds
 
   type LatLng = [number, number];
 
@@ -45,15 +47,15 @@ export const MapTab: React.FC = () => {
 
 
 
-  // Calculate map center based on geofence or devices
+  // Calculate map center based on geofence, live locations, or devices
   const getMapCenter = (): [number, number] => {
-    //if (geofences.length > 0 && geofences[0].coordinates.length > 0) {
-    //  const coords = geofences[0].coordinates[0];
-    //  return coords;
-    //}
     if (geofences.length > 0) {
       const coords = toLatLngArray(geofences[0].coordinates);
       if (coords.length > 0) return coords[0];
+    }
+    // Use first live location if available
+    if (locations.length > 0) {
+      return [locations[0].lat, locations[0].lng];
     }
     if (devices.length > 0) {
       return [devices[0].lat, devices[0].lng];
@@ -155,12 +157,39 @@ export const MapTab: React.FC = () => {
   }
 
 
-  // Prepare markers
-  //const markers = devices.map((device) => ({
-  //  position: [device.lat, device.lng] as [number, number],
-  //  color: getMarkerColor(device.status),
-  //  label: `${device.animalName} - ${getStatusText(device.status)}`,
-  //}));
+  // Prepare markers from live locations
+  const markers = useMemo(() => {
+    return locations.map((location) => {
+      const updatedAt = new Date(location.updated_at);
+      const now = new Date();
+      const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
+      
+      // Determine marker color based on how recent the update is
+      let color = '#78A64A'; // Green for recent
+      if (secondsSinceUpdate > 60) {
+        color = '#EF4444'; // Red for stale (> 1 minute)
+      } else if (secondsSinceUpdate > 30) {
+        color = '#FFEE8A'; // Yellow for somewhat stale (> 30 seconds)
+      }
+
+      // Build popup content
+      const popupContent = `
+        <div style="padding: 8px;">
+          <strong>Tracker: ${location.tracker_id}</strong><br/>
+          <small>Updated: ${updatedAt.toLocaleString()}</small><br/>
+          ${location.speed_mps !== null ? `<small>Speed: ${(location.speed_mps * 3.6).toFixed(1)} km/h</small><br/>` : ''}
+          ${location.accuracy_m !== null ? `<small>Accuracy: ${location.accuracy_m.toFixed(1)}m</small>` : ''}
+        </div>
+      `;
+
+      return {
+        position: [location.lat, location.lng] as [number, number],
+        color,
+        label: `Tracker ${location.tracker_id}`,
+        popup: popupContent,
+      };
+    });
+  }, [locations]);
 
 
 
@@ -168,11 +197,28 @@ export const MapTab: React.FC = () => {
 
   return (
     <div className="h-full relative">
+      {/* Loading indicator */}
+      {loading && locations.length === 0 && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg px-4 py-2 shadow-lg z-[1000] flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-[var(--deep-forest)]" />
+          <span className="text-sm text-[var(--deep-forest)]">Loading locations...</span>
+        </div>
+      )}
+
+      {/* Error indicator */}
+      {error && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 rounded-lg px-4 py-2 shadow-lg z-[1000] max-w-sm">
+          <p className="text-sm">Error: {error}</p>
+          <p className="text-xs mt-1">Make sure VITE_SUPABASE_ANON_KEY is set in your .env file</p>
+        </div>
+      )}
+
       {/* Map */}
       <LeafletMap
         center={getMapCenter()}
-        zoom={20}
+        zoom={locations.length > 0 ? 15 : 20}
         polygons={polygons}
+        markers={markers}
         className="w-full h-full"
       />
 

@@ -128,7 +128,9 @@ export const LeafletMap: React.FC<MapProps> = ({
       }).addTo(mapInstanceRef.current!);
 
       // Add popup if label or popup provided
-      if (marker.label) {
+      if (marker.popup) {
+        circleMarker.bindPopup(marker.popup, { className: 'custom-popup' });
+      } else if (marker.label) {
         circleMarker.bindPopup(marker.label);
       }
 
