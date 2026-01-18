@@ -27,7 +27,9 @@
 
   ### 3. Database Schema
 
-  The app expects a table named `live_locations` with the following schema:
+  The app expects two tables in Supabase:
+
+  **1. `live_locations` table** - for tracking device locations:
 
   ```sql
   create table public.live_locations (
@@ -47,9 +49,48 @@
   create index IF not exists idx_live_locations_updated_at on public.live_locations using btree (updated_at desc);
   ```
 
+  **2. `geofences` table** - for storing user-defined geofences:
+
+  Run the SQL from `supabase_geofences_schema.sql` in your Supabase SQL editor, or use this:
+
+  ```sql
+  CREATE TABLE IF NOT EXISTS public.geofences (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    boundary_inner JSONB NOT NULL, -- GeoJSON Polygon
+    boundary_outer JSONB, -- GeoJSON Polygon (buffer zone)
+    buffer_m INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_geofences_user_id ON public.geofences(user_id);
+  CREATE INDEX IF NOT EXISTS idx_geofences_created_at ON public.geofences(created_at DESC);
+
+  ALTER TABLE public.geofences ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "Allow all operations for geofences" ON public.geofences
+    FOR ALL USING (true) WITH CHECK (true);
+  ```
+
+  ### 4. Server Configuration (Optional)
+
+  If you're using the Express server to save geofences, add these environment variables to `server/.env`:
+
+  ```
+  SUPABASE_URL=https://thrmkorvklpvbbctsgti.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+  ```
+
+  The server will automatically save geofences to both your local PostgreSQL database and Supabase.
+
   ## Running the code
 
   Run `npm run dev` to start the development server.
 
-  The app will automatically fetch and display live locations from your Supabase database on the map.
+  The app will automatically:
+  - Fetch and display live locations from the `live_locations` table
+  - Fetch and display geofences from the `geofences` table
+  - Update in real-time as new data arrives
   

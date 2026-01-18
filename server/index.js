@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -8,6 +9,15 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL || 'https://thrmkorvklpvbbctsgti.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+if (!supabaseKey) {
+  console.warn('⚠️ Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY. Geofences will not be saved to Supabase.');
+}
 
 const pool = new Pool({
   host: process.env.PGHOST || 'localhost',
@@ -102,9 +112,37 @@ app.post('/api/geofences', async (req, res) => {
 
     const values = [name || "Geofence", userId, geojsonText, buffer_m || 0];
 
-
     const result = await pool.query(text, values);
-    res.json(result.rows[0]);
+    const savedGeofence = result.rows[0];
+
+    // Also save to Supabase
+    if (supabase) {
+      try {
+        const { data: supabaseData, error: supabaseError } = await supabase
+          .from('geofences')
+          .insert({
+            name: savedGeofence.name,
+            user_id: savedGeofence.userId,
+            boundary_inner: savedGeofence.boundaryInner,
+            boundary_outer: savedGeofence.boundaryOuter,
+            buffer_m: savedGeofence.bufferM,
+          })
+          .select()
+          .single();
+
+        if (supabaseError) {
+          console.error('Error saving to Supabase:', supabaseError);
+          // Continue anyway - we still saved to Postgres
+        } else {
+          console.log('Geofence saved to Supabase:', supabaseData.id);
+        }
+      } catch (supabaseErr) {
+        console.error('Supabase save error:', supabaseErr);
+        // Continue anyway - we still saved to Postgres
+      }
+    }
+
+    res.json(savedGeofence);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

@@ -5,12 +5,14 @@ import { GeoButton } from '../GeoButton';
 import { MapPin, Trash2, Edit, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveLocations } from '../../hooks/useLiveLocations';
+import { useGeofences } from '../../hooks/useGeofences';
 
 export const MapTab: React.FC = () => {
   const navigate = useNavigate();
-  const { devices, geofences, removeGeofence } = useApp();
+  const { devices, geofences: localGeofences, removeGeofence, user } = useApp();
   const [showRetry, setShowRetry] = useState(false);
-  const { locations, loading, error } = useLiveLocations(5000); // Poll every 5 seconds
+  const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(5000); // Poll every 5 seconds
+  const { geofences: supabaseGeofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
 
   type LatLng = [number, number];
 
@@ -47,10 +49,22 @@ export const MapTab: React.FC = () => {
 
 
 
+  // Combine local and Supabase geofences
+  const allGeofences = useMemo(() => {
+    // Convert Supabase geofences to the format expected by the app
+    const supabaseFormatted = supabaseGeofences.map((gf) => ({
+      id: gf.id.toString(),
+      name: gf.name,
+      coordinates: gf.boundary_inner,
+      userId: gf.user_id,
+    }));
+    return [...localGeofences, ...supabaseFormatted];
+  }, [localGeofences, supabaseGeofences]);
+
   // Calculate map center based on geofence, live locations, or devices
   const getMapCenter = (): [number, number] => {
-    if (geofences.length > 0) {
-      const coords = toLatLngArray(geofences[0].coordinates);
+    if (allGeofences.length > 0) {
+      const coords = toLatLngArray(allGeofences[0].coordinates);
       if (coords.length > 0) return coords[0];
     }
     // Use first live location if available
@@ -64,8 +78,8 @@ export const MapTab: React.FC = () => {
   };
 
   const handleDeleteGeofence = () => {
-    if (geofences.length > 0 && confirm('Delete this geofence?')) {
-      removeGeofence(geofences[0].id);
+    if (allGeofences.length > 0 && confirm('Delete this geofence?')) {
+      removeGeofence(allGeofences[0].id);
     }
   };
 
@@ -132,29 +146,56 @@ export const MapTab: React.FC = () => {
   //  });
   //}
 
-  const polygons = [];
-  if (geofences.length > 0) {
-    const geofence = geofences[0];
-    const coords = toLatLngArray(geofence.coordinates);
+  // Prepare polygons from all geofences (local + Supabase)
+  const polygons = useMemo(() => {
+    const polyArray: Array<{
+      coordinates: [number, number][];
+      color: string;
+      fillColor: string;
+      fillOpacity: number;
+    }> = [];
 
-    if (coords.length >= 3) {
-      // Buffer zone (simple 10% bigger)
-      polygons.push({
-        coordinates: getBufferPolygon(coords),
-        color: '#3FB7FF',
-        fillColor: '#3FB7FF',
-        fillOpacity: 0.1,
-      });
+    allGeofences.forEach((geofence) => {
+      const coords = toLatLngArray(geofence.coordinates);
 
-      // Main geofence
-      polygons.push({
-        coordinates: coords,
-        color: '#78A64A',
-        fillColor: '#78A64A',
-        fillOpacity: 0.3,
-      });
-    }
-  }
+      if (coords.length >= 3) {
+        // Buffer zone (simple 10% bigger) - only if we have outer boundary
+        const supabaseGeofence = supabaseGeofences.find((gf) => gf.id.toString() === geofence.id);
+        if (supabaseGeofence?.boundary_outer) {
+          const outerCoords = toLatLngArray(supabaseGeofence.boundary_outer);
+          if (outerCoords.length >= 3) {
+            polyArray.push({
+              coordinates: outerCoords,
+              color: '#3FB7FF',
+              fillColor: '#3FB7FF',
+              fillOpacity: 0.1,
+            });
+          }
+        } else {
+          // Fallback to simple buffer calculation
+          const bufferCoords = getBufferPolygon(coords);
+          if (bufferCoords.length >= 3) {
+            polyArray.push({
+              coordinates: bufferCoords,
+              color: '#3FB7FF',
+              fillColor: '#3FB7FF',
+              fillOpacity: 0.1,
+            });
+          }
+        }
+
+        // Main geofence
+        polyArray.push({
+          coordinates: coords,
+          color: '#78A64A',
+          fillColor: '#78A64A',
+          fillOpacity: 0.3,
+        });
+      }
+    });
+
+    return polyArray;
+  }, [allGeofences, supabaseGeofences]);
 
 
   // Prepare markers from live locations
@@ -197,19 +238,26 @@ export const MapTab: React.FC = () => {
 
   return (
     <div className="h-full relative">
-      {/* Loading indicator */}
-      {loading && locations.length === 0 && (
+      {/* Loading indicators */}
+      {(locationsLoading || geofencesLoading) && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg px-4 py-2 shadow-lg z-[1000] flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin text-[var(--deep-forest)]" />
-          <span className="text-sm text-[var(--deep-forest)]">Loading locations...</span>
+          <span className="text-sm text-[var(--deep-forest)]">
+            {locationsLoading && geofencesLoading ? 'Loading...' : locationsLoading ? 'Loading locations...' : 'Loading geofences...'}
+          </span>
         </div>
       )}
 
-      {/* Error indicator */}
-      {error && (
+      {/* Error indicators */}
+      {locationsError && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 rounded-lg px-4 py-2 shadow-lg z-[1000] max-w-sm">
-          <p className="text-sm">Error: {error}</p>
+          <p className="text-sm">Error loading locations: {locationsError}</p>
           <p className="text-xs mt-1">Make sure VITE_SUPABASE_ANON_KEY is set in your .env file</p>
+        </div>
+      )}
+      {geofencesError && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 rounded-lg px-4 py-2 shadow-lg z-[1000] max-w-sm">
+          <p className="text-sm">Error loading geofences: {geofencesError}</p>
         </div>
       )}
 
@@ -232,7 +280,7 @@ export const MapTab: React.FC = () => {
             <Edit className="w-4 h-4" />
             Edit Fence
           </button>
-          {geofences.length > 0 && (
+          {allGeofences.length > 0 && (
             <button
               onClick={handleDeleteGeofence}
               className="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-600 flex items-center justify-center gap-2 shadow-lg"
