@@ -15,6 +15,7 @@ export const MapTab: React.FC = () => {
   const [showRetry, setShowRetry] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [mapZoom, setMapZoom] = useState<number>(15);
+  const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(5000);
   const { geofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
   const { alerts } = useAlerts(user?.id, true);
@@ -78,19 +79,9 @@ export const MapTab: React.FC = () => {
   // Use the stored center or default
   const currentCenter = mapCenter || [51.969209, 7.595595];
 
-  const handleDeleteGeofence = async () => {
-    if (geofences.length > 0 && confirm('Delete this geofence?')) {
-      const geofenceToDelete = geofences[0];
-      const { error } = await supabase
-        .from('geofences')
-        .delete()
-        .eq('id', geofenceToDelete.id);
-      
-      if (error) {
-        console.error('Error deleting geofence:', error);
-        alert('Failed to delete geofence');
-      }
-    }
+  // Clear selection when clicking on map (not on polygon)
+  const handleMapClick = () => {
+    setSelectedGeofenceId(null);
   };
 
   const getMarkerColor = (status: string) => {
@@ -163,6 +154,7 @@ export const MapTab: React.FC = () => {
       color: string;
       fillColor: string;
       fillOpacity: number;
+      id: number;
     }> = [];
 
     geofences.forEach((geofence) => {
@@ -175,12 +167,28 @@ export const MapTab: React.FC = () => {
           color: '#78A64A',
           fillColor: '#78A64A',
           fillOpacity: 0.3,
+          id: geofence.id,
         });
       }
     });
 
     return polyArray;
   }, [geofences]);
+
+  // Handle polygon click
+  const handlePolygonClick = (polygonIndex: number) => {
+    const polygon = polygons[polygonIndex];
+    if (polygon) {
+      setSelectedGeofenceId(polygon.id);
+    }
+  };
+
+  // Handle edit zone
+  const handleEditZone = () => {
+    if (selectedGeofenceId) {
+      navigate(`/draw-geofence?mode=edit&id=${selectedGeofenceId}`);
+    }
+  };
 
 
   // Prepare markers from live locations with coloring rules:
@@ -270,32 +278,26 @@ export const MapTab: React.FC = () => {
         center={currentCenter}
         zoom={mapZoom}
         onZoomChange={setMapZoom}
+        onMapClick={handleMapClick}
+        onPolygonClick={handlePolygonClick}
         polygons={polygons}
         markers={markers}
+        selectedPolygonId={selectedGeofenceId}
         className="w-full h-full"
       />
 
-      {/* Bottom Controls */}
-      <div className="absolute bottom-4 left-4 right-4 space-y-2 z-[1000]">
-        <div className="flex gap-2">
+      {/* Bottom Controls - Show Edit Zone button when polygon is selected */}
+      {selectedGeofenceId && (
+        <div className="absolute bottom-4 left-4 right-4 z-[1000]">
           <button
-            onClick={() => navigate('/draw-geofence')}
-            className="flex-1 bg-white text-[var(--deep-forest)] px-3 py-2 rounded-lg text-sm hover:bg-gray-100 flex items-center justify-center gap-2 shadow-lg"
+            onClick={handleEditZone}
+            className="w-full bg-[var(--grass-green)] text-white px-4 py-3 rounded-lg text-sm hover:bg-[var(--pine-green)] flex items-center justify-center gap-2 shadow-lg font-medium"
           >
             <Edit className="w-4 h-4" />
-            Edit Fence
+            Edit zone
           </button>
-          {geofences.length > 0 && (
-            <button
-              onClick={handleDeleteGeofence}
-              className="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-600 flex items-center justify-center gap-2 shadow-lg"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Fence
-            </button>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Connection Retry */}
       {showRetry && (

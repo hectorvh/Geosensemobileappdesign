@@ -6,11 +6,14 @@ interface MapProps {
   zoom: number;
   onMapClick?: (lat: number, lng: number) => void;
   onZoomChange?: (zoom: number) => void;
+  onPolygonClick?: (polygonIndex: number) => void;
+  onMarkerClick?: (markerIndex: number) => void;
   polygons?: Array<{
     coordinates: [number, number][];
     color?: string;
     fillColor?: string;
     fillOpacity?: number;
+    id?: string | number;
   }>;
   markers?: Array<{
     position: [number, number];
@@ -18,6 +21,7 @@ interface MapProps {
     label?: string;
     popup?: React.ReactNode;
   }>;
+  selectedPolygonId?: string | number | null;
   className?: string;
 }
 
@@ -26,8 +30,11 @@ export const LeafletMap: React.FC<MapProps> = ({
   zoom,
   onMapClick,
   onZoomChange,
+  onPolygonClick,
+  onMarkerClick,
   polygons = [],
   markers = [],
+  selectedPolygonId,
   className = '',
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -37,6 +44,8 @@ export const LeafletMap: React.FC<MapProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const onMapClickRef = useRef<MapProps["onMapClick"]>(onMapClick);
   const onZoomChangeRef = useRef<MapProps["onZoomChange"]>(onZoomChange);
+  const onPolygonClickRef = useRef<MapProps["onPolygonClick"]>(onPolygonClick);
+  const onMarkerClickRef = useRef<MapProps["onMarkerClick"]>(onMarkerClick);
   const currentZoomRef = useRef<number>(zoom);
   const isUserInteractionRef = useRef<boolean>(false);
 
@@ -60,9 +69,12 @@ export const LeafletMap: React.FC<MapProps> = ({
     tileLayer.addTo(map);
     tileLayerRef.current = tileLayer;
 
-    // Handle map clicks
+    // Handle map clicks (but not on polygons/markers)
     map.on('click', (e: any) => {
-      onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      // Only trigger if clicking directly on the map, not on a layer
+      if (e.originalEvent && e.originalEvent.target === map.getContainer()) {
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      }
     });
 
     // Track zoom changes from user interaction
@@ -130,6 +142,16 @@ export const LeafletMap: React.FC<MapProps> = ({
   // Don't update zoom after initial mount - let user control it
   // Zoom is only set on initial mount above
 
+  // Update polygon click callback
+  useEffect(() => {
+    onPolygonClickRef.current = onPolygonClick;
+  }, [onPolygonClick]);
+
+  // Update marker click callback
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
+
   // Update polygons
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -139,19 +161,44 @@ export const LeafletMap: React.FC<MapProps> = ({
     polygonLayersRef.current = [];
 
     // Add new polygons
-    polygons.forEach((polygon) => {
+    polygons.forEach((polygon, index) => {
       if (polygon.coordinates.length < 3) return;
 
+      const isSelected = selectedPolygonId !== undefined && polygon.id === selectedPolygonId;
+      
       const leafletPolygon = L.polygon(polygon.coordinates, {
-        color: polygon.color || '#78A64A',
-        fillColor: polygon.fillColor || '#78A64A',
-        fillOpacity: polygon.fillOpacity ?? 0.3,
-        weight: 3,
+        color: isSelected ? '#3FB7FF' : (polygon.color || '#78A64A'),
+        fillColor: isSelected ? '#3FB7FF' : (polygon.fillColor || '#78A64A'),
+        fillOpacity: isSelected ? 0.5 : (polygon.fillOpacity ?? 0.3),
+        weight: isSelected ? 4 : 3,
       }).addTo(mapInstanceRef.current!);
+
+      // Add click handler for polygon
+      if (onPolygonClick) {
+        leafletPolygon.on('click', () => {
+          onPolygonClickRef.current?.(index);
+        });
+      }
+
+      // Make polygon interactive
+      leafletPolygon.on('mouseover', function() {
+        this.setStyle({
+          weight: 4,
+          fillOpacity: 0.5,
+        });
+      });
+      leafletPolygon.on('mouseout', function() {
+        if (!isSelected) {
+          this.setStyle({
+            weight: 3,
+            fillOpacity: polygon.fillOpacity ?? 0.3,
+          });
+        }
+      });
 
       polygonLayersRef.current.push(leafletPolygon);
     });
-  }, [polygons]);
+  }, [polygons, selectedPolygonId, onPolygonClick]);
 
   // Update markers
   useEffect(() => {
@@ -162,7 +209,7 @@ export const LeafletMap: React.FC<MapProps> = ({
     markerLayersRef.current = [];
 
     // Add new markers
-    markers.forEach((marker) => {
+    markers.forEach((marker, index) => {
       const circleMarker = L.circleMarker(marker.position, {
         radius: 8,
         fillColor: marker.color,
@@ -171,6 +218,13 @@ export const LeafletMap: React.FC<MapProps> = ({
         opacity: 1,
         fillOpacity: 1,
       }).addTo(mapInstanceRef.current!);
+
+      // Add click handler for marker
+      if (onMarkerClick) {
+        circleMarker.on('click', () => {
+          onMarkerClickRef.current?.(index);
+        });
+      }
 
       // Add popup if label or popup provided
       if (marker.popup) {
@@ -181,7 +235,7 @@ export const LeafletMap: React.FC<MapProps> = ({
 
       markerLayersRef.current.push(circleMarker);
     });
-  }, [markers]);
+  }, [markers, onMarkerClick]);
 
   useEffect(() => {
     onMapClickRef.current = onMapClick;

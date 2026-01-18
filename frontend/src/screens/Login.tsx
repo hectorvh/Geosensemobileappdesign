@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 import welcomeImage from '../assets/P1260790-2.jpg';
 
 export const Login: React.FC = () => {
@@ -28,7 +29,18 @@ export const Login: React.FC = () => {
       }
       
       if (data?.user) {
-        navigate('/tutorial');
+        // Check if user has seen tutorial
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tutorial_seen')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (profile?.tutorial_seen) {
+          navigate('/main');
+        } else {
+          navigate('/tutorial');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

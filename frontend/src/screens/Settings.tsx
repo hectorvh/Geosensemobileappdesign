@@ -69,11 +69,15 @@ export const Settings: React.FC = () => {
         {/* Management Sections */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <button
-            onClick={() => navigate('/draw-geofence')}
+            onClick={() => {
+              // Navigate to edit mode - will need to select a geofence
+              // For now, navigate to create mode, user can select from MapTab
+              navigate('/draw-geofence?mode=create');
+            }}
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
-            <span className="flex-1 text-left text-[var(--deep-forest)]">Edit Geofence</span>
+            <span className="flex-1 text-left text-[var(--deep-forest)]">Edit zone</span>
             <span className="text-gray-400">→</span>
           </button>
           
@@ -88,10 +92,19 @@ export const Settings: React.FC = () => {
           
           <button
             onClick={() => navigate('/customize-alerts')}
-            className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+            className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <Bell className="w-5 h-5 text-[var(--high-yellow)]" />
             <span className="flex-1 text-left text-[var(--deep-forest)]">Change Alerts</span>
+            <span className="text-gray-400">→</span>
+          </button>
+          
+          <button
+            onClick={() => navigate('/tutorial')}
+            className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+          >
+            <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
+            <span className="flex-1 text-left text-[var(--deep-forest)]">Tutorial</span>
             <span className="text-gray-400">→</span>
           </button>
         </div>
