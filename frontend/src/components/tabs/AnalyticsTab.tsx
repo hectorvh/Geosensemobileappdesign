@@ -1,32 +1,74 @@
-import React, { useState } from 'react';
-import { useApp } from '../../contexts/AppContext';
+import React, { useState, useMemo } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useDevices } from '../../hooks/useDevices';
+import { useAlerts } from '../../hooks/useAlerts';
+import { useLiveLocations } from '../../hooks/useLiveLocations';
 import { ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export const AnalyticsTab: React.FC = () => {
-  const { devices, alerts } = useApp();
+  const { user } = useAuth();
+  const { devices } = useDevices(user?.id);
+  const { alerts } = useAlerts(user?.id, true);
+  const { locations } = useLiveLocations(5000);
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Generate mock movement data for chart
-  const generateMockData = () => {
-    return Array.from({ length: 24 }, (_, i) => ({
-      hour: `${i}:00`,
-      distance: Math.random() * 2,
-    }));
-  };
+  // Generate movement timeline data from live_locations
+  const generateMovementData = useMemo(() => {
+    // Group locations by hour of the day
+    const hourlyData: { [hour: number]: number[] } = {};
+    
+    locations.forEach((location) => {
+      const date = new Date(location.captured_at || location.updated_at);
+      const hour = date.getHours();
+      if (!hourlyData[hour]) {
+        hourlyData[hour] = [];
+      }
+      // Convert speed from m/s to km/h
+      const speedKmh = location.speed_mps ? location.speed_mps * 3.6 : 0;
+      hourlyData[hour].push(speedKmh);
+    });
+
+    // Calculate average speed per hour
+    return Array.from({ length: 24 }, (_, i) => {
+      const speeds = hourlyData[i] || [];
+      const avgSpeed = speeds.length > 0
+        ? speeds.reduce((sum, s) => sum + s, 0) / speeds.length
+        : 0;
+      return {
+        hour: `${i}:00`,
+        speed: avgSpeed,
+      };
+    });
+  }, [locations]);
 
   const toggleDevice = (deviceId: string) => {
     setExpandedDevice(expandedDevice === deviceId ? null : deviceId);
   };
 
-  // Calculate herd statistics
-  const totalActive = devices.filter((d) => d.activeTime > 0).length;
-  const totalInactive = devices.length - totalActive;
-  const activePercentage = devices.length > 0 ? Math.round((totalActive / devices.length) * 100) : 0;
-  const todayAlerts = alerts.filter(
-    (a) => new Date(a.timestamp).toDateString() === new Date().toDateString()
-  ).length;
+  // Calculate herd statistics according to requirements:
+  // - Active Animals: count devices where active = true
+  // - Inactive Animals: count devices where active = false
+  // - Alerts Today: count alerts where active = true AND created_at is today
+  const stats = useMemo(() => {
+    const activeAnimals = devices.filter((d) => d.active).length;
+    const inactiveAnimals = devices.filter((d) => !d.active).length;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const alertsToday = alerts.filter((a) => {
+      const alertDate = new Date(a.created_at);
+      alertDate.setHours(0, 0, 0, 0);
+      return alertDate.getTime() === today.getTime() && a.active;
+    }).length;
+
+    return {
+      activeAnimals,
+      inactiveAnimals,
+      alertsToday,
+    };
+  }, [devices, alerts]);
 
   return (
     <div className="h-full bg-gray-50 overflow-y-auto">
@@ -38,18 +80,18 @@ export const AnalyticsTab: React.FC = () => {
             <div className="bg-green-50 rounded-lg p-3">
               <p className="text-sm text-gray-600">Active Animals</p>
               <p className="text-[var(--deep-forest)]">
-                {totalActive} ({activePercentage}%)
+                {stats.activeAnimals}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-sm text-gray-600">Inactive Animals</p>
               <p className="text-[var(--deep-forest)]">
-                {totalInactive} ({100 - activePercentage}%)
+                {stats.inactiveAnimals}
               </p>
             </div>
             <div className="bg-red-50 rounded-lg p-3 col-span-2">
               <p className="text-sm text-gray-600">Alerts Today</p>
-              <p className="text-[var(--deep-forest)]">{todayAlerts}</p>
+              <p className="text-[var(--deep-forest)]">{stats.alertsToday}</p>
             </div>
           </div>
         </div>
@@ -79,8 +121,8 @@ export const AnalyticsTab: React.FC = () => {
                   className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                 >
                   <div className="text-left">
-                    <h4 className="text-[var(--deep-forest)]">{device.animalName}</h4>
-                    <p className="text-sm text-gray-600">ID: {device.id}</p>
+                    <h4 className="text-[var(--deep-forest)]">{device.animal_name || device.name || 'Unknown'}</h4>
+                    <p className="text-sm text-gray-600">ID: {device.tracker_id}</p>
                   </div>
                   {isExpanded ? (
                     <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -94,19 +136,19 @@ export const AnalyticsTab: React.FC = () => {
                   <div className="px-4 pb-4 grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-sm text-gray-600">Current Speed</p>
-                      <p className="text-[var(--deep-forest)]">{device.speed.toFixed(1)} km/h</p>
+                      <p className="text-[var(--deep-forest)]">{Number(device.speed).toFixed(1)} km/h</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Distance Today</p>
-                      <p className="text-[var(--deep-forest)]">{device.distanceToday.toFixed(2)} km</p>
+                      <p className="text-sm text-gray-600">Total Distance</p>
+                      <p className="text-[var(--deep-forest)]">{Number(device.total_distance).toFixed(2)} km</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Active Time</p>
-                      <p className="text-[var(--deep-forest)]">{device.activeTime} min</p>
+                      <p className="text-[var(--deep-forest)]">{Math.floor(device.active_time / 60)} min</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Inactive Time</p>
-                      <p className="text-[var(--deep-forest)]">{device.inactiveTime} min</p>
+                      <p className="text-[var(--deep-forest)]">{Math.floor(device.inactive_time / 60)} min</p>
                     </div>
                   </div>
                 )}
@@ -124,35 +166,35 @@ export const AnalyticsTab: React.FC = () => {
                       </div>
                       <div className="bg-gray-50 rounded-lg p-3">
                         <p className="text-sm text-gray-600">Current Speed</p>
-                        <p className="text-[var(--deep-forest)]">{device.speed.toFixed(1)} km/h</p>
+                        <p className="text-[var(--deep-forest)]">{Number(device.speed).toFixed(1)} km/h</p>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-3">
                         <p className="text-sm text-gray-600">Active Time</p>
-                        <p className="text-[var(--deep-forest)]">{device.activeTime} min</p>
+                        <p className="text-[var(--deep-forest)]">{Math.floor(device.active_time / 60)} min</p>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-3">
                         <p className="text-sm text-gray-600">Inactive Time</p>
-                        <p className="text-[var(--deep-forest)]">{device.inactiveTime} min</p>
+                        <p className="text-[var(--deep-forest)]">{Math.floor(device.inactive_time / 60)} min</p>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-3 col-span-2">
                         <p className="text-sm text-gray-600">Total Distance</p>
-                        <p className="text-[var(--deep-forest)]">{device.distanceToday.toFixed(2)} km</p>
+                        <p className="text-[var(--deep-forest)]">{Number(device.total_distance).toFixed(2)} km</p>
                       </div>
                     </div>
 
-                    {/* Timeline Chart */}
+                    {/* Movement Timeline Chart - y-axis speed, x-axis hours */}
                     <div>
                       <h4 className="text-[var(--deep-forest)] mb-2">Movement Timeline</h4>
                       <div className="h-48">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={generateMockData()}>
+                          <LineChart data={generateMovementData}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
+                            <YAxis label={{ value: 'Speed (km/h)', angle: -90, position: 'insideLeft' }} tick={{ fontSize: 10 }} />
                             <Tooltip />
                             <Line
                               type="monotone"
-                              dataKey="distance"
+                              dataKey="speed"
                               stroke="#78A64A"
                               strokeWidth={2}
                               dot={false}
@@ -160,14 +202,6 @@ export const AnalyticsTab: React.FC = () => {
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
-                    </div>
-
-                    {/* Average Distance */}
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <p className="text-sm text-gray-600">Average Distance Travelled</p>
-                      <p className="text-[var(--deep-forest)]">
-                        {(device.distanceToday * 0.9).toFixed(2)} km
-                      </p>
                     </div>
 
                     {/* Mini Map Placeholder */}

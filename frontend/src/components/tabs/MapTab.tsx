@@ -1,18 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../../contexts/AppContext';
 import { LeafletMap } from '../LeafletMap';
 import { GeoButton } from '../GeoButton';
 import { MapPin, Trash2, Edit, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import { useLiveLocations } from '../../hooks/useLiveLocations';
 import { useGeofences } from '../../hooks/useGeofences';
+import { useAlerts } from '../../hooks/useAlerts';
+import { supabase } from '../../lib/supabase';
 
 export const MapTab: React.FC = () => {
   const navigate = useNavigate();
-  const { devices, geofences: localGeofences, removeGeofence, user } = useApp();
+  const { user } = useAuth();
   const [showRetry, setShowRetry] = useState(false);
-  const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(5000); // Poll every 5 seconds
-  const { geofences: supabaseGeofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
+  const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(5000);
+  const { geofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
+  const { alerts } = useAlerts(user?.id, true);
 
   type LatLng = [number, number];
 
@@ -49,37 +52,31 @@ export const MapTab: React.FC = () => {
 
 
 
-  // Combine local and Supabase geofences
-  const allGeofences = useMemo(() => {
-    // Convert Supabase geofences to the format expected by the app
-    const supabaseFormatted = supabaseGeofences.map((gf) => ({
-      id: gf.id.toString(),
-      name: gf.name,
-      coordinates: gf.boundary_inner,
-      userId: gf.user_id,
-    }));
-    return [...localGeofences, ...supabaseFormatted];
-  }, [localGeofences, supabaseGeofences]);
-
-  // Calculate map center based on geofence, live locations, or devices
+  // Calculate map center based on geofence or live locations
   const getMapCenter = (): [number, number] => {
-    if (allGeofences.length > 0) {
-      const coords = toLatLngArray(allGeofences[0].coordinates);
+    if (geofences.length > 0) {
+      const coords = toLatLngArray(geofences[0].boundary_inner);
       if (coords.length > 0) return coords[0];
     }
     // Use first live location if available
     if (locations.length > 0) {
       return [locations[0].lat, locations[0].lng];
     }
-    if (devices.length > 0) {
-      return [devices[0].lat, devices[0].lng];
-    }
     return [51.969209, 7.595595];
   };
 
-  const handleDeleteGeofence = () => {
-    if (allGeofences.length > 0 && confirm('Delete this geofence?')) {
-      removeGeofence(allGeofences[0].id);
+  const handleDeleteGeofence = async () => {
+    if (geofences.length > 0 && confirm('Delete this geofence?')) {
+      const geofenceToDelete = geofences[0];
+      const { error } = await supabase
+        .from('geofences')
+        .delete()
+        .eq('id', geofenceToDelete.id);
+      
+      if (error) {
+        console.error('Error deleting geofence:', error);
+        alert('Failed to delete geofence');
+      }
     }
   };
 
@@ -146,7 +143,7 @@ export const MapTab: React.FC = () => {
   //  });
   //}
 
-  // Prepare polygons from all geofences (local + Supabase)
+  // Prepare polygons from geofences (only inner_geom, not outer_geom)
   const polygons = useMemo(() => {
     const polyArray: Array<{
       coordinates: [number, number][];
@@ -155,36 +152,11 @@ export const MapTab: React.FC = () => {
       fillOpacity: number;
     }> = [];
 
-    allGeofences.forEach((geofence) => {
-      const coords = toLatLngArray(geofence.coordinates);
+    geofences.forEach((geofence) => {
+      const coords = toLatLngArray(geofence.boundary_inner);
 
       if (coords.length >= 3) {
-        // Buffer zone (simple 10% bigger) - only if we have outer boundary
-        const supabaseGeofence = supabaseGeofences.find((gf) => gf.id.toString() === geofence.id);
-        if (supabaseGeofence?.boundary_outer) {
-          const outerCoords = toLatLngArray(supabaseGeofence.boundary_outer);
-          if (outerCoords.length >= 3) {
-            polyArray.push({
-              coordinates: outerCoords,
-              color: '#3FB7FF',
-              fillColor: '#3FB7FF',
-              fillOpacity: 0.1,
-            });
-          }
-        } else {
-          // Fallback to simple buffer calculation
-          const bufferCoords = getBufferPolygon(coords);
-          if (bufferCoords.length >= 3) {
-            polyArray.push({
-              coordinates: bufferCoords,
-              color: '#3FB7FF',
-              fillColor: '#3FB7FF',
-              fillOpacity: 0.1,
-            });
-          }
-        }
-
-        // Main geofence
+        // Only show inner_geom (main geofence) - per requirements, do not render outer_geom
         polyArray.push({
           coordinates: coords,
           color: '#78A64A',
@@ -195,22 +167,39 @@ export const MapTab: React.FC = () => {
     });
 
     return polyArray;
-  }, [allGeofences, supabaseGeofences]);
+  }, [geofences]);
 
 
-  // Prepare markers from live locations
+  // Prepare markers from live locations with coloring rules:
+  // - green: live_location_active = true AND has_active_alert = false
+  // - red: live_location_active = true AND has_active_alert = true
+  // - grey: live_location_active = false
   const markers = useMemo(() => {
     return locations.map((location) => {
       const updatedAt = new Date(location.updated_at);
       const now = new Date();
       const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
       
-      // Determine marker color based on how recent the update is
-      let color = '#78A64A'; // Green for recent
-      if (secondsSinceUpdate > 60) {
-        color = '#EF4444'; // Red for stale (> 1 minute)
-      } else if (secondsSinceUpdate > 30) {
-        color = '#FFEE8A'; // Yellow for somewhat stale (> 30 seconds)
+      // Determine if location is active (updated within last 1 minute)
+      const live_location_active = secondsSinceUpdate <= 60;
+      
+      // Check if device has active alert
+      // Find device by tracker_id, then check if it has active alerts
+      const deviceAlerts = alerts.filter((alert) => {
+        // We need to match by device_id, but we only have tracker_id
+        // For now, we'll check if any alert's device tracker_id matches
+        return alert.device?.tracker_id === location.tracker_id;
+      });
+      const has_active_alert = deviceAlerts.length > 0;
+      
+      // Determine marker color based on rules
+      let color = '#9CA3AF'; // Grey (default - inactive)
+      if (live_location_active) {
+        if (has_active_alert) {
+          color = '#EF4444'; // Red: active but has alert
+        } else {
+          color = '#78A64A'; // Green: active and no alert
+        }
       }
 
       // Build popup content
@@ -218,6 +207,8 @@ export const MapTab: React.FC = () => {
         <div style="padding: 8px;">
           <strong>Tracker: ${location.tracker_id}</strong><br/>
           <small>Updated: ${updatedAt.toLocaleString()}</small><br/>
+          <small>Status: ${live_location_active ? 'Active' : 'Inactive'}</small><br/>
+          ${has_active_alert ? '<small style="color: red;">⚠ Has Active Alert</small><br/>' : ''}
           ${location.speed_mps !== null ? `<small>Speed: ${(location.speed_mps * 3.6).toFixed(1)} km/h</small><br/>` : ''}
           ${location.accuracy_m !== null ? `<small>Accuracy: ${location.accuracy_m.toFixed(1)}m</small>` : ''}
         </div>
@@ -230,7 +221,7 @@ export const MapTab: React.FC = () => {
         popup: popupContent,
       };
     });
-  }, [locations]);
+  }, [locations, alerts]);
 
 
 
@@ -280,7 +271,7 @@ export const MapTab: React.FC = () => {
             <Edit className="w-4 h-4" />
             Edit Fence
           </button>
-          {allGeofences.length > 0 && (
+          {geofences.length > 0 && (
             <button
               onClick={handleDeleteGeofence}
               className="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-600 flex items-center justify-center gap-2 shadow-lg"

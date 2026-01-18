@@ -2,34 +2,51 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
-import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../hooks/useAuth';
 import welcomeImage from '../assets/P1260790-2.jpg';
 
 export const SignUp: React.FC = () => {
   const navigate = useNavigate();
-  const { setUser } = useApp();
+  const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
-    // Mock user creation
-    const newUser = {
-      id: Date.now().toString(),
-      email,
-      language: 'EN' as const,
-      units: 'km' as const,
-    };
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
     
-    setUser(newUser);
-    navigate('/tutorial');
+    try {
+      const { data, error: signUpError } = await signUp(email, password);
+      
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+      
+      if (data?.user) {
+        navigate('/tutorial');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,12 +69,19 @@ export const SignUp: React.FC = () => {
           </h1>
         
         <form onSubmit={handleSignUp} className="space-y-4">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+          
           <GeoInput
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           
           <GeoInput
@@ -66,6 +90,7 @@ export const SignUp: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
           
           <GeoInput
@@ -74,6 +99,7 @@ export const SignUp: React.FC = () => {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
+            disabled={loading}
           />
           
           <div className="space-y-3 pt-4">
@@ -81,8 +107,9 @@ export const SignUp: React.FC = () => {
               type="submit"
               variant="primary" 
               className="w-full"
+              disabled={loading}
             >
-              Sign up
+              {loading ? 'Signing up...' : 'Sign up'}
             </GeoButton>
             
             <GeoButton 

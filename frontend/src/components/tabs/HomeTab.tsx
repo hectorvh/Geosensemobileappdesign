@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { useApp } from '../../contexts/AppContext';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useDevices } from '../../hooks/useDevices';
+import { useAlerts } from '../../hooks/useAlerts';
 import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
-import welcomeImage from '@/assets/20250621-P1300259-2-3.jpg';
+import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
 
 export const HomeTab: React.FC = () => {
-  const { devices, alerts } = useApp();
+  const { user } = useAuth();
+  const { devices } = useDevices(user?.id);
+  const { alerts } = useAlerts(user?.id, true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   useEffect(() => {
@@ -15,9 +19,21 @@ export const HomeTab: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const insideCount = devices.filter((d) => d.status === 'inside').length;
-  const outsideCount = devices.filter((d) => d.status !== 'inside').length;
-  const activeAlertsCount = alerts.filter((a) => !a.resolved).length;
+  // Calculate counts according to requirements:
+  // - Active Alerts: count of alerts where active = true
+  // - Animals Outside: count of devices where animal_outside = true AND active = true
+  // - Animals Inside: count of devices where animal_outside = false AND active = true
+  const counts = useMemo(() => {
+    const activeAlertsCount = alerts.filter((a) => a.active).length;
+    const animalsOutside = devices.filter((d) => d.animal_outside && d.active).length;
+    const animalsInside = devices.filter((d) => !d.animal_outside && d.active).length;
+    
+    return {
+      activeAlerts: activeAlertsCount,
+      animalsOutside,
+      animalsInside,
+    };
+  }, [devices, alerts]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -39,7 +55,7 @@ export const HomeTab: React.FC = () => {
             <CheckCircle2 className="w-6 h-6 text-[var(--grass-green)]" />
             <h3 className="text-[var(--deep-forest)]">Animals Inside</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{insideCount} animals</p>
+          <p className="text-[var(--deep-forest)]">{counts.animalsInside} animals</p>
           <p className="text-sm text-gray-600 mt-1">
             All animals are within the safe zone
           </p>
@@ -50,8 +66,8 @@ export const HomeTab: React.FC = () => {
             <AlertTriangle className="w-6 h-6 text-orange-500" />
             <h3 className="text-[var(--deep-forest)]">Animals Outside</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{outsideCount} animals</p>
-          {outsideCount > 0 && (
+          <p className="text-[var(--deep-forest)]">{counts.animalsOutside} animals</p>
+          {counts.animalsOutside > 0 && (
             <p className="text-sm text-orange-600 mt-1">
               Check map for details
             </p>
@@ -63,8 +79,8 @@ export const HomeTab: React.FC = () => {
             <AlertTriangle className="w-6 h-6 text-red-500" />
             <h3 className="text-[var(--deep-forest)]">Active Alerts</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{activeAlertsCount} alerts</p>
-          {activeAlertsCount > 0 && (
+          <p className="text-[var(--deep-forest)]">{counts.activeAlerts} alerts</p>
+          {counts.activeAlerts > 0 && (
             <p className="text-sm text-red-600 mt-1">
               Requires your attention
             </p>
@@ -97,9 +113,12 @@ export const HomeTab: React.FC = () => {
             <div className="flex justify-between">
               <span className="text-gray-600">Battery Average:</span>
               <span className="text-[var(--deep-forest)]">
-                {devices.length > 0
+                {devices.length > 0 && devices.some(d => d.battery_level)
                   ? Math.round(
-                      devices.reduce((acc, d) => acc + d.batteryLevel, 0) / devices.length
+                      devices
+                        .filter(d => d.battery_level)
+                        .reduce((acc, d) => acc + (d.battery_level || 0), 0) / 
+                      devices.filter(d => d.battery_level).length
                     )
                   : 0}
                 %

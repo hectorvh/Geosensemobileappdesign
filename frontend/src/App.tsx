@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AppProvider, useApp } from './contexts/AppContext';
+import { AppProvider } from './contexts/AppContext';
+import { useAuth } from './hooks/useAuth';
 import { Welcome } from './screens/Welcome';
 import { SignUp } from './screens/SignUp';
 import { Login } from './screens/Login';
@@ -14,73 +15,21 @@ import { Toaster } from './components/ui/sonner';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useApp();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="mobile-screen flex items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+  
   return user ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 // App Content with Routes
 const AppContent: React.FC = () => {
-  const { user, setDevices, setAlerts } = useApp();
-
-  // Initialize with mock data when user logs in
-  useEffect(() => {
-    if (user && setDevices) {
-      // Add some mock devices for demo purposes
-      const mockDevices = [
-        {
-          id: 'GPS001',
-          animalName: 'Cow Bella',
-          age: 3,
-          weight: 450,
-          batchId: 'A1',
-          lat: 51.969021,
-          lng: 7.595455,
-          status: 'inside' as const,
-          batteryLevel: 85,
-          lastActive: new Date(),
-          speed: 1.2,
-          activeTime: 180,
-          inactiveTime: 60,
-          distanceToday: 3.5,
-        },
-        {
-          id: 'GPS002',
-          animalName: 'Goat Daisy',
-          age: 2,
-          weight: 380,
-          batchId: 'A1',
-          lat: 51.969202,
-          lng: 7.595461,
-          status: 'inside' as const,
-          batteryLevel: 92,
-          lastActive: new Date(),
-          speed: 0.8,
-          activeTime: 150,
-          inactiveTime: 90,
-          distanceToday: 2.8,
-        },
-        {
-          id: 'GPS003',
-          animalName: 'Sheep Molly',
-          age: 4,
-          weight: 220,
-          batchId: 'A2',
-          lat: 51.968945,
-          lng: 7.595660,
-          status: 'outside-alert' as const,
-          batteryLevel: 12,
-          lastActive: new Date(Date.now() - 1800000),
-          speed: 0.3,
-          activeTime: 45,
-          inactiveTime: 195,
-          distanceToday: 1.2,
-        },
-      ];
-
-      // Only set if devices are empty (first time initialization)
-      setDevices(mockDevices);
-    }
-  }, [user]);
 
   return (
     <Routes>

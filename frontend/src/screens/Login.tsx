@@ -2,28 +2,39 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
-import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../hooks/useAuth';
 import welcomeImage from '../assets/P1260790-2.jpg';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { setUser } = useApp();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
     
-    // Mock user login
-    const user = {
-      id: Date.now().toString(),
-      email,
-      language: 'EN' as const,
-      units: 'km' as const,
-    };
-    
-    setUser(user);
-    navigate('/tutorial');
+    try {
+      const { data, error: signInError } = await signIn(email, password);
+      
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+      
+      if (data?.user) {
+        navigate('/tutorial');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -47,12 +58,19 @@ export const Login: React.FC = () => {
           </h1>
         
         <form onSubmit={handleLogin} className="space-y-4">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+          
           <GeoInput
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           
           <GeoInput
@@ -61,6 +79,7 @@ export const Login: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
           
           <div className="space-y-4 pt-4">
@@ -68,8 +87,9 @@ export const Login: React.FC = () => {
               type="submit"
               variant="primary" 
               className="w-full"
+              disabled={loading}
             >
-              Log in
+              {loading ? 'Logging in...' : 'Log in'}
             </GeoButton>
             
             <GeoButton 

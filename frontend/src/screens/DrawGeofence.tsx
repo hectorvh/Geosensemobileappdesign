@@ -5,14 +5,15 @@ import type { Feature, Polygon, MultiPolygon } from "geojson";
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { LeafletMap } from '../components/LeafletMap';
-import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 import { MapPin, Navigation, X, Trash2 } from 'lucide-react';
 import welcomeImage from '../assets/20250621-P1300259-2-3.jpg';
 
 
 export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
-  const { user, addGeofence } = useApp();
+  const { user } = useAuth();
   const [searchLocation, setSearchLocation] = useState('');
   const [mapCenter, setMapCenter] = useState<[number, number]>([51.969205, 7.595761]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -77,7 +78,7 @@ export const DrawGeofence: React.FC = () => {
     setIsDrawing(false);
   };
 
-  const handleSaveGeofence = () => {
+  const handleSaveGeofence = async () => {
     if (savedPolygon.length === 0) {
       alert('Please draw a geofence on the map first.');
       return;
@@ -88,77 +89,56 @@ export const DrawGeofence: React.FC = () => {
       return;
     }
 
-    // POST polygon + buffer to backend API (see server/) then add to local context
-    (async () => {
-      try {
-        const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:4000';
-        //const payload = {
-        //  name: 'My Geofence',
-        //  userId: user.id,
-        //  boundary_inner: savedPolygon,
-        //  boundary_outer: outerPolygon.length ? outerPolygon : null,
-        //  buffer_m: bufferMeters,
-        //};
+    try {
+      // Convert [lat,lng][] -> GeoJSON Polygon (GeoJSON uses [lng,lat])
+      const ring: number[][] = savedPolygon.map(([lat, lng]) => [lng, lat]);
 
-        // Convert [lat,lng][] -> GeoJSON Polygon (GeoJSON uses [lng,lat])
-        const ring: number[][] = savedPolygon.map(([lat, lng]) => [lng, lat]);
-
-        // ensure closed ring
-        const first = ring[0];
-        const last = ring[ring.length - 1];
-        if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]]);
-
-        const innerFeature = turf.polygon([ring]);
-
-        // If you still want to send outer to backend (optional)
-        let outerGeom: any = null;
-        if (bufferMeters && bufferMeters > 0) {
-          const buffered = turf.buffer(innerFeature, bufferMeters, { units: "meters" }) as any;
-          const g = buffered?.geometry;
-
-          if (g?.type === "Polygon") outerGeom = g;
-          else if (g?.type === "MultiPolygon") {
-            // take first polygon (simple approach)
-            outerGeom = { type: "Polygon", coordinates: g.coordinates[0] };
-          }
-        } else {
-          outerGeom = innerFeature.geometry; // no buffer => same as inner
-        }
-
-        const payload = {
-          name: "My Geofence",
-          userId: user.id,
-          boundary_inner: innerFeature.geometry, // ✅ GeoJSON Polygon
-          boundary_outer: outerGeom,            // ✅ GeoJSON Polygon (or set to null if you don’t need it)
-          buffer_m: bufferMeters,
-        };
-
-
-        const res = await fetch(`${apiBase}/api/geofences`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to save geofence');
-        }
-        const saved = await res.json();
-        const newGeofence = {
-          id: saved.id?.toString() || Date.now().toString(),
-          name: saved.name || 'My Geofence',
-          coordinates: saved.boundaryInner || savedPolygon,
-          boundaryOuter: saved.boundaryOuter || outerPolygon,
-          buffer_m: saved.bufferM || bufferMeters,
-          userId: saved.userId || user.id,
-        } as any;
-        addGeofence({ id: newGeofence.id, name: newGeofence.name, coordinates: newGeofence.coordinates, userId: newGeofence.userId });
-        navigate('/link-devices');
-      } catch (error: any) {
-        console.error('Save geofence failed', error);
-        alert('Unable to save geofence to server: ' + (error?.message || 'unknown error'));
+      // Ensure closed ring
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        ring.push([first[0], first[1]]);
       }
-    })();
+
+      const innerFeature = turf.polygon([ring]);
+
+      // Calculate outer geometry if buffer is set
+      let outerGeom: any = null;
+      if (bufferMeters && bufferMeters > 0) {
+        const buffered = turf.buffer(innerFeature, bufferMeters, { units: "meters" }) as any;
+        const g = buffered?.geometry;
+
+        if (g?.type === "Polygon") {
+          outerGeom = g;
+        } else if (g?.type === "MultiPolygon") {
+          // Take first polygon
+          outerGeom = { type: "Polygon", coordinates: g.coordinates[0] };
+        }
+      }
+
+      // Save directly to Supabase
+      const { data, error } = await supabase
+        .from('geofences')
+        .insert({
+          name: "My Geofence",
+          user_id: user.id,
+          boundary_inner: innerFeature.geometry,
+          boundary_outer: outerGeom,
+          buffer_m: bufferMeters,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Success - navigate to next screen
+      navigate('/link-devices');
+    } catch (error: any) {
+      console.error('Save geofence failed', error);
+      alert('Unable to save geofence: ' + (error?.message || 'unknown error'));
+    }
   };
 
   const polygons = [];
