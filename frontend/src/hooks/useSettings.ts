@@ -9,6 +9,7 @@ export interface Settings {
   enable_out_of_range: boolean;
   enable_inactiviy: boolean; // Note: matches DB column name exactly (with typo)
   enable_low_battery: boolean;
+  boundary_buffer_m: number; // Boundary buffer distance in meters (0-50)
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +43,7 @@ export const useSettings = (userId?: string) => {
               enable_out_of_range: true,
               enable_inactiviy: true,
               enable_low_battery: true,
+              boundary_buffer_m: 0, // Default: toggle OFF
             })
             .select()
             .single();

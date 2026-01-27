@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { useAuth } from '../hooks/useAuth';
@@ -21,121 +21,46 @@ export const CustomizeAlerts: React.FC = () => {
   const [lowBattery, setLowBattery] = useState(true);
   const [inactivity, setInactivity] = useState(true);
   
-  // Boundary Buffer state
+  // Boundary Buffer state (local only, saved on Save button click)
   const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferMeters, setBufferMeters] = useState(0);
-  const [isUpdatingBuffer, setIsUpdatingBuffer] = useState(false);
   
-  // Debounce timer ref for buffer updates
-  const bufferUpdateTimeoutRef = useRef<number | null>(null);
-  
-  // Load settings from Supabase
+  // Load settings from Supabase and initialize local state
   useEffect(() => {
     if (settings) {
       setOutOfRange(settings.enable_out_of_range ?? true);
       setLowBattery(settings.enable_low_battery ?? true);
       setInactivity(settings.enable_inactiviy ?? true); // Note: matches DB column name
+      
+      // Initialize Boundary Buffer local state from DB
+      const bufferValue = settings.boundary_buffer_m ?? 0;
+      setBufferMeters(Math.max(0, Math.min(50, bufferValue))); // Clamp to 0-50
+      setBufferEnabled(bufferValue > 0);
     }
   }, [settings]);
   
-  // Load first geofence by default, or selected one
+  // Load first geofence by default (for geofence selector only)
   useEffect(() => {
     if (geofences.length > 0 && !selectedGeofenceId) {
       setSelectedGeofenceId(geofences[0].id);
-      setBufferEnabled(geofences[0].buffer_m > 0);
-      setBufferMeters(geofences[0].buffer_m || 0);
-    } else if (selectedGeofenceId) {
-      const geofence = geofences.find(g => g.id === selectedGeofenceId);
-      if (geofence) {
-        setBufferEnabled(geofence.buffer_m > 0);
-        setBufferMeters(geofence.buffer_m || 0);
-      }
     }
   }, [geofences, selectedGeofenceId]);
   
-  // Update buffer when toggle or slider changes (with debouncing for slider)
-  const handleBufferUpdate = useCallback(async (newBufferMeters: number, enabled: boolean, immediate: boolean = false) => {
-    if (!selectedGeofenceId || !user?.id) {
-      toast.error('Please select a geofence first');
-      return;
-    }
-    
-    // Clear any pending debounced update
-    if (bufferUpdateTimeoutRef.current) {
-      clearTimeout(bufferUpdateTimeoutRef.current);
-      bufferUpdateTimeoutRef.current = null;
-    }
-    
-    const performUpdate = async () => {
-      setIsUpdatingBuffer(true);
-      try {
-        const finalBufferMeters = enabled ? newBufferMeters : 0;
-        
-        // Call RPC function to update buffer
-        const { data, error } = await supabase.rpc('update_geofence_buffer', {
-          p_geofence_id: selectedGeofenceId,
-          p_buffer_m: finalBufferMeters,
-          p_user_id: user.id,
-        });
-        
-        if (error) {
-          throw error;
-        }
-        
-        // RPC function returns a table, so data is an array
-        if (!data || !Array.isArray(data) || data.length === 0) {
-          throw new Error('Update failed: no data returned');
-        }
-        
-        toast.success('Boundary buffer updated successfully');
-        
-        // Update local state
-        setBufferMeters(finalBufferMeters);
-        setBufferEnabled(enabled);
-      } catch (error: any) {
-        console.error('Error updating buffer:', error);
-        // Enhanced error logging (always log details for debugging)
-        console.error('Buffer update error details:', {
-          geofenceId: selectedGeofenceId,
-          bufferMeters: newBufferMeters,
-          enabled,
-          errorMessage: error?.message,
-          errorCode: error?.code,
-          errorDetails: error?.details,
-        });
-        toast.error('Failed to update buffer: ' + (error?.message || 'unknown error'));
-      } finally {
-        setIsUpdatingBuffer(false);
-      }
-    };
-    
-    if (immediate) {
-      await performUpdate();
-    } else {
-      // Debounce slider updates (400ms)
-      bufferUpdateTimeoutRef.current = window.setTimeout(performUpdate, 400);
-    }
-  }, [selectedGeofenceId, user?.id]);
-  
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (bufferUpdateTimeoutRef.current) {
-        clearTimeout(bufferUpdateTimeoutRef.current);
-      }
-    };
-  }, []);
   
   const handleSaveSettings = async () => {
     if (!user?.id) return;
     
     try {
+      // Compute final boundary_buffer_m value: 0 if toggle OFF, slider value if ON
+      const finalBufferMeters = bufferEnabled ? Math.max(0, Math.min(50, bufferMeters)) : 0;
+      
       // Upsert settings (create if doesn't exist, update if exists)
       const updates: any = {
         enable_out_of_range: outOfRange,
         enable_inactiviy: inactivity, // Note: matches DB column name
         enable_low_battery: lowBattery,
+        boundary_buffer_m: finalBufferMeters, // Save Boundary Buffer value
       };
       
       const { error } = await updateSettings(updates);
@@ -186,11 +111,8 @@ export const CustomizeAlerts: React.FC = () => {
               onChange={(e) => {
                 const id = parseInt(e.target.value);
                 setSelectedGeofenceId(id);
-                const geofence = geofences.find(g => g.id === id);
-                if (geofence) {
-                  setBufferEnabled(geofence.buffer_m > 0);
-                  setBufferMeters(geofence.buffer_m || 0);
-                }
+                // Note: Buffer value is now stored in settings, not geofences
+                // The geofence selector is only for selecting which geofence to apply buffer to (future use)
               }}
               className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--grass-green)] text-[var(--deep-forest)]"
             >
@@ -272,64 +194,50 @@ export const CustomizeAlerts: React.FC = () => {
         </div>
         
         {/* Boundary Buffer - Moved to bottom */}
-        {selectedGeofenceId && (
-          <div className="bg-white/90 rounded-lg p-4">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
-                  <h4 className="text-[var(--deep-forest)]">Boundary Buffer</h4>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Add a buffer zone around your geofence boundary
-                </p>
+        <div className="bg-white/90 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
+                <h4 className="text-[var(--deep-forest)]">Boundary Buffer</h4>
               </div>
-              <Switch
-                checked={bufferEnabled}
-                onCheckedChange={(checked) => {
-                  setBufferEnabled(checked);
-                  handleBufferUpdate(bufferMeters, checked, true); // Immediate for toggle
-                }}
-                disabled={isUpdatingBuffer}
-              />
+              <p className="text-sm text-gray-600">
+                Add a buffer zone around your geofence boundary
+              </p>
             </div>
-            
-            {bufferEnabled && (
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-gray-600">Buffer Distance</label>
-                  <span className="text-sm font-medium text-[var(--deep-forest)]">
-                    {bufferMeters} m
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  step="1"
-                  value={bufferMeters}
-                  onChange={(e) => {
-                    const newValue = parseInt(e.target.value);
-                    setBufferMeters(newValue);
-                    // Debounced update on slider change
-                    handleBufferUpdate(newValue, true, false);
-                  }}
-                  onMouseUp={() => handleBufferUpdate(bufferMeters, true, true)} // Immediate on release
-                  onTouchEnd={() => handleBufferUpdate(bufferMeters, true, true)} // Immediate on release
-                  disabled={isUpdatingBuffer}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[var(--grass-green)]"
-                />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>0 m</span>
-                  <span>50 m</span>
-                </div>
-                {isUpdatingBuffer && (
-                  <p className="text-xs text-gray-500 mt-1">Updating...</p>
-                )}
-              </div>
-            )}
+            <Switch
+              checked={bufferEnabled}
+              onCheckedChange={setBufferEnabled}
+              disabled={settingsLoading}
+            />
           </div>
-        )}
+          
+          {bufferEnabled && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-gray-600">Buffer Distance</label>
+                <span className="text-sm font-medium text-[var(--deep-forest)]">
+                  {bufferMeters} m
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="50"
+                step="1"
+                value={bufferMeters}
+                onChange={(e) => {
+                  const newValue = parseInt(e.target.value);
+                  setBufferMeters(Math.max(0, Math.min(50, newValue))); // Clamp to 0-50, local state only
+                }}
+                disabled={settingsLoading}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[var(--grass-green)]"
+              />
+              <div className="flex justify-between text-xs text-gray-500">
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bottom Buttons */}
