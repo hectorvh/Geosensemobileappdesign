@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as turf from '@turf/turf';
 import { LeafletMap } from '../components/LeafletMap';
@@ -6,36 +6,116 @@ import { GeoButton } from '../components/GeoButton';
 import { useAuth } from '../hooks/useAuth';
 import { useGeofences } from '../hooks/useGeofences';
 import { supabase } from '../lib/supabase';
-import { Search, Navigation, X, Trash2 } from 'lucide-react';
+import { Search, Navigation, X, Trash2, Move } from 'lucide-react';
 import { toast } from 'sonner';
+
+type LatLng = [number, number];
+
+const VIEWPORT_STORAGE_KEY = 'drawGeofence:lastViewport';
+
+interface ViewportState {
+  center: [number, number];
+  zoom: number;
+}
 
 export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { geofences, refetch: refetchGeofences } = useGeofences(user?.id);
   
-  // Get mode and id from URL params
-  const mode = searchParams.get('mode') || 'create';
-  const geofenceId = searchParams.get('id') ? parseInt(searchParams.get('id')!) : null;
+  // State machine: 'create' | 'edit'
+  const [mode, setMode] = useState<'create' | 'edit'>('create');
+  const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   
-  // Find geofence to edit if in edit mode
-  const editingGeofence = useMemo(() => {
-    if (mode === 'edit' && geofenceId) {
-      return geofences.find(g => g.id === geofenceId) || null;
-    }
-    return null;
-  }, [mode, geofenceId, geofences]);
-
+  // Map state
   const [mapCenter, setMapCenter] = useState<[number, number]>([51.969205, 7.595761]);
   const [mapZoom, setMapZoom] = useState<number>(15);
-  const [currentPolygon, setCurrentPolygon] = useState<[number, number][]>([]);
-  const [savedPolygon, setSavedPolygon] = useState<[number, number][]>([]);
+  
+  // Polygon state
+  const [currentPolygon, setCurrentPolygon] = useState<LatLng[]>([]);
+  const [savedPolygon, setSavedPolygon] = useState<LatLng[]>([]);
   const [bufferMeters, setBufferMeters] = useState<number>(0);
+  
+  // UI state
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
-  const [selectedPointPosition, setSelectedPointPosition] = useState<[number, number] | null>(null);
+  const [selectedPointPosition, setSelectedPointPosition] = useState<LatLng | null>(null);
+  const [isMovingPoint, setIsMovingPoint] = useState(false);
+  const [movingPointIndex, setMovingPointIndex] = useState<number | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  
+  // Refs
+  const validationTimeoutRef = useRef<number | null>(null);
+
+  // Load viewport from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(VIEWPORT_STORAGE_KEY);
+      if (saved) {
+        const viewport: ViewportState = JSON.parse(saved);
+        setMapCenter(viewport.center);
+        setMapZoom(viewport.zoom);
+      }
+    } catch (e) {
+      console.error('Failed to load viewport:', e);
+    }
+  }, []);
+
+  // Save viewport to localStorage on change
+  useEffect(() => {
+    try {
+      const viewport: ViewportState = { center: mapCenter, zoom: mapZoom };
+      localStorage.setItem(VIEWPORT_STORAGE_KEY, JSON.stringify(viewport));
+    } catch (e) {
+      console.error('Failed to save viewport:', e);
+    }
+  }, [mapCenter, mapZoom]);
+
+  // Initialize from URL params
+  // SECURITY: Verify ownership when loading from URL params
+  useEffect(() => {
+    const urlMode = searchParams.get('mode') || 'create';
+    const urlId = searchParams.get('id') ? parseInt(searchParams.get('id')!) : null;
+    
+    if (urlMode === 'edit' && urlId && user?.id) {
+      // Verify the geofence belongs to the current user
+      const geofence = geofences.find(g => g.id === urlId && g.user_id === user.id);
+      if (geofence) {
+        setMode('edit');
+        setSelectedGeofenceId(urlId);
+      } else if (geofences.length > 0) {
+        // Only show error if geofences have loaded (to avoid false positives during loading)
+        // Geofence not found or doesn't belong to user - switch to create mode
+        console.warn('Attempted to edit geofence not owned by current user:', urlId);
+        toast.error('You don\'t have permission to edit this zone.');
+        setMode('create');
+        setSelectedGeofenceId(null);
+        setSearchParams({ mode: 'create' });
+      }
+      // If geofences are still loading, wait for them to load
+    } else {
+      setMode('create');
+      setSelectedGeofenceId(null);
+    }
+  }, [searchParams, geofences, user?.id, setSearchParams]);
+
+  // Load selected geofence for editing
+  // SECURITY: Only allow editing geofences from the user-filtered list
+  const editingGeofence = useMemo(() => {
+    if (selectedGeofenceId && user?.id) {
+      const geofence = geofences.find(g => g.id === selectedGeofenceId);
+      // Verify ownership before allowing edit
+      if (geofence && geofence.user_id === user.id) {
+        return geofence;
+      }
+      // If geofence not found in user's list, it doesn't belong to them
+      console.warn('Attempted to edit geofence not owned by current user');
+      return null;
+    }
+    return null;
+  }, [selectedGeofenceId, geofences, user?.id]);
 
   // Initialize polygon if editing
   useEffect(() => {
@@ -43,22 +123,19 @@ export const DrawGeofence: React.FC = () => {
       const coords = toLatLngArray(editingGeofence.boundary_inner);
       if (coords.length >= 3) {
         setSavedPolygon(coords);
-        // Center map on geofence
-        if (coords.length > 0) {
-          setMapCenter(coords[0]);
-        }
+      // Center map on geofence
+      if (coords.length > 0) {
+        const ring: number[][] = coords.map(([lat, lng]: LatLng) => [lng, lat]);
+        const center = turf.centroid(turf.polygon([ring]));
+        const centerCoords = center.geometry.coordinates;
+        setMapCenter([centerCoords[1] as number, centerCoords[0] as number] as [number, number]);
       }
+      }
+    } else if (mode === 'create') {
+      setSavedPolygon([]);
+      setCurrentPolygon([]);
     }
-  }, [editingGeofence]);
-
-  // Enable drawing by default
-  useEffect(() => {
-    if (mode === 'create' && savedPolygon.length === 0) {
-      // Drawing is enabled by default - no need to set isDrawing state
-    }
-  }, [mode, savedPolygon.length]);
-
-  type LatLng = [number, number];
+  }, [editingGeofence, mode]);
 
   function toLatLngArray(input: any): LatLng[] {
     if (!input) return [];
@@ -80,7 +157,55 @@ export const DrawGeofence: React.FC = () => {
     return [];
   }
 
-  // Check if user has completed onboarding (has at least one geofence)
+  // Validate polygon geometry using Supabase RPC
+  const validatePolygon = useCallback(async (polygon: LatLng[]): Promise<boolean> => {
+    if (polygon.length < 3) return true; // Allow incomplete polygons
+    
+    try {
+      // Convert to GeoJSON Polygon
+      const ring: number[][] = polygon.map(([lat, lng]) => [lng, lat]);
+      // Ensure closed ring
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        ring.push([first[0], first[1]]);
+      }
+      
+      const geojson = {
+        type: 'Polygon',
+        coordinates: [ring]
+      };
+
+      const { data, error } = await supabase.rpc('validate_polygon_simple', {
+        p_geojson: geojson
+      });
+
+      if (error) {
+        console.error('Validation error:', error);
+        return false;
+      }
+
+      return data === true;
+    } catch (error) {
+      console.error('Validation failed:', error);
+      return false;
+    }
+  }, []);
+
+  // Debounced validation (not used currently, but kept for future use)
+  // const validatePolygonDebounced = useCallback(async (polygon: LatLng[]) => {
+  //   if (validationTimeoutRef.current) {
+  //     clearTimeout(validationTimeoutRef.current);
+  //   }
+  //   
+  //   validationTimeoutRef.current = window.setTimeout(async () => {
+  //     setIsValidating(true);
+  //     const isValid = await validatePolygon(polygon);
+  //     setIsValidating(false);
+  //     return isValid;
+  //   }, 300);
+  // }, [validatePolygon]);
+
   const hasCompletedOnboarding = geofences.length > 0;
 
   const handleUseCurrentLocation = () => {
@@ -102,29 +227,93 @@ export const DrawGeofence: React.FC = () => {
   const handleSearchLocation = async () => {
     if (!searchQuery.trim()) return;
     
-    // TODO: Implement geocoding service (Nominatim, Google Maps, etc.)
-    // For now, show placeholder
     toast.info('Geocoding service will be implemented soon');
-    
-    // Mock: center on a default location
     setMapCenter([51.969205, 7.595761]);
     setShowSearchModal(false);
     setSearchQuery('');
   };
 
-  const handleMapClick = (lat: number, lng: number) => {
+  const handleMapClick = async (lat: number, lng: number) => {
+    // If moving a point, place it at the clicked location
+    if (isMovingPoint && movingPointIndex !== null) {
+      const displayPolygon = savedPolygon.length > 0 ? savedPolygon : currentPolygon;
+      const newPolygon: LatLng[] = [...displayPolygon];
+      newPolygon[movingPointIndex] = [lat, lng] as LatLng;
+      
+      // Validate the new polygon
+      setIsValidating(true);
+      const isValid = await validatePolygon(newPolygon);
+      setIsValidating(false);
+      
+      if (!isValid) {
+        toast.error('Please draw a non-overlapping zone');
+        setIsMovingPoint(false);
+        setMovingPointIndex(null);
+        return;
+      }
+      
+      // Update polygon
+      if (savedPolygon.length > 0) {
+        setSavedPolygon(newPolygon);
+      } else {
+        setCurrentPolygon(newPolygon);
+      }
+      
+      setIsMovingPoint(false);
+      setMovingPointIndex(null);
+      return;
+    }
+    
+    // If in edit mode and clicking empty space, switch to create mode
+    if (mode === 'edit' && selectedPointIndex === null) {
+      setMode('create');
+      setSelectedGeofenceId(null);
+      setSavedPolygon([]);
+      setCurrentPolygon([]);
+      return;
+    }
+    
     // If editing existing polygon, don't allow adding new points
     if (mode === 'edit' && savedPolygon.length > 0) {
       return;
     }
     
     // Add point to current polygon
-    setCurrentPolygon((prev) => [...prev, [lat, lng]]);
+    const newPolygon: LatLng[] = [...currentPolygon, [lat, lng] as LatLng];
+    
+    // Validate if polygon has 3+ points (4th point onward)
+    if (newPolygon.length >= 3) {
+      setIsValidating(true);
+      const isValid = await validatePolygon(newPolygon);
+      setIsValidating(false);
+      
+      if (!isValid) {
+        toast.error('Please draw a non-overlapping zone');
+        return; // Don't add the point
+      }
+    }
+    
+    setCurrentPolygon(newPolygon);
     setSelectedPointIndex(null);
   };
 
+  const handlePolygonClick = (polygonIndex: number) => {
+    // SECURITY: Only allow selecting geofences from the user-filtered list
+    // The geofences array already contains only the current user's geofences
+    const clickedGeofence = geofences[polygonIndex];
+    if (clickedGeofence && clickedGeofence.user_id === user?.id) {
+      // Double-check ownership (defense in depth)
+      setMode('edit');
+      setSelectedGeofenceId(clickedGeofence.id);
+      // Update URL
+      setSearchParams({ mode: 'edit', id: clickedGeofence.id.toString() });
+    } else {
+      console.warn('Attempted to select geofence not owned by current user');
+      toast.error('You can only edit your own zones.');
+    }
+  };
+
   const handleMarkerClick = (markerIndex: number) => {
-    // Show point deletion option
     const displayPolygon = savedPolygon.length > 0 ? savedPolygon : currentPolygon;
     if (displayPolygon[markerIndex]) {
       setSelectedPointIndex(markerIndex);
@@ -132,24 +321,45 @@ export const DrawGeofence: React.FC = () => {
     }
   };
 
+  const handleMovePoint = () => {
+    if (selectedPointIndex !== null) {
+      setIsMovingPoint(true);
+      setMovingPointIndex(selectedPointIndex);
+      setSelectedPointIndex(null);
+      setSelectedPointPosition(null);
+      toast.info('Click on the map to move this point');
+    }
+  };
+
   const handleDeletePoint = (index: number) => {
     if (savedPolygon.length > 0) {
-      // Delete from saved polygon
       const newPolygon = savedPolygon.filter((_, i) => i !== index);
       setSavedPolygon(newPolygon);
     } else {
-      // Delete from current polygon
       const newPolygon = currentPolygon.filter((_, i) => i !== index);
       setCurrentPolygon(newPolygon);
     }
     setSelectedPointIndex(null);
+    setIsMovingPoint(false);
+    setMovingPointIndex(null);
   };
 
-  const handleCompletePolygon = () => {
+  const handleCompletePolygon = async () => {
     if (currentPolygon.length < 3) {
       toast.error('A geofence needs at least 3 points.');
       return;
     }
+    
+    // Final validation
+    setIsValidating(true);
+    const isValid = await validatePolygon(currentPolygon);
+    setIsValidating(false);
+    
+    if (!isValid) {
+      toast.error('Please draw a non-overlapping zone');
+      return;
+    }
+    
     setSavedPolygon(currentPolygon);
     setCurrentPolygon([]);
     setBufferMeters(0);
@@ -160,14 +370,14 @@ export const DrawGeofence: React.FC = () => {
     setCurrentPolygon([]);
     setBufferMeters(0);
     setSelectedPointIndex(null);
+    setIsMovingPoint(false);
+    setMovingPointIndex(null);
   };
 
   const handleBack = () => {
     if (!hasCompletedOnboarding) {
-      // First-time onboarding - go to LinkDevices
       navigate('/link-devices');
     } else {
-      // Return to MapTab
       navigate('/main');
     }
   };
@@ -180,16 +390,23 @@ export const DrawGeofence: React.FC = () => {
       return;
     }
 
+    // Final validation before save
+    setIsValidating(true);
+    const isValid = await validatePolygon(polygonToSave);
+    setIsValidating(false);
+    
+    if (!isValid) {
+      toast.error('Please draw a non-overlapping zone');
+      return;
+    }
+
     if (!user) {
       toast.error('User not found. Please log in again.');
       return;
     }
 
     try {
-      // Convert [lat,lng][] -> GeoJSON Polygon (GeoJSON uses [lng,lat])
       const ring: number[][] = polygonToSave.map(([lat, lng]) => [lng, lat]);
-
-      // Ensure closed ring
       const first = ring[0];
       const last = ring[ring.length - 1];
       if (first[0] !== last[0] || first[1] !== last[1]) {
@@ -198,12 +415,10 @@ export const DrawGeofence: React.FC = () => {
 
       const innerFeature = turf.polygon([ring]);
 
-      // Calculate outer geometry if buffer is set
       let outerGeom: any = null;
-      if (bufferMeters && bufferMeters > 0) {
+      if (bufferMeters && bufferMeters > 0 && mode === 'create') {
         const buffered = turf.buffer(innerFeature, bufferMeters, { units: "meters" }) as any;
         const g = buffered?.geometry;
-
         if (g?.type === "Polygon") {
           outerGeom = g;
         } else if (g?.type === "MultiPolygon") {
@@ -211,9 +426,24 @@ export const DrawGeofence: React.FC = () => {
         }
       }
 
-      if (mode === 'edit' && geofenceId) {
-        // Update existing geofence
-        const { error } = await supabase
+      if (mode === 'edit' && selectedGeofenceId) {
+        // SECURITY: Verify ownership before update (defense in depth)
+        // First, verify the geofence exists and belongs to the user
+        const { data: existingGeofence, error: verifyError } = await supabase
+          .from('geofences')
+          .select('id, user_id')
+          .eq('id', selectedGeofenceId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (verifyError || !existingGeofence) {
+          toast.error('You don\'t have permission to edit this zone.');
+          console.error('Geofence ownership verification failed:', verifyError);
+          return;
+        }
+
+        // Now perform the update (RLS will also enforce ownership)
+        const { data: updatedData, error: updateError } = await supabase
           .from('geofences')
           .update({
             boundary_inner: innerFeature.geometry,
@@ -221,16 +451,25 @@ export const DrawGeofence: React.FC = () => {
             buffer_m: bufferMeters,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', geofenceId)
-          .eq('user_id', user.id);
+          .eq('id', selectedGeofenceId)
+          .eq('user_id', user.id) // Explicit user filter
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Verify update succeeded (0 rows = permission denied)
+        if (!updatedData) {
+          toast.error('You don\'t have permission to edit this zone.');
+          return;
+        }
         
         toast.success('Zone updated successfully');
         await refetchGeofences();
         navigate('/main');
       } else {
-        // Create new geofence
         const { data, error } = await supabase
           .from('geofences')
           .insert({
@@ -261,24 +500,55 @@ export const DrawGeofence: React.FC = () => {
   };
 
   const handleDeleteZone = async () => {
-    if (!geofenceId || mode !== 'edit') return;
+    if (!selectedGeofenceId || mode !== 'edit' || !user?.id) return;
     
     if (!confirm('Are you sure you want to delete this zone?')) {
       return;
     }
 
     try {
-      const { error } = await supabase
+      // SECURITY: Verify ownership before delete (defense in depth)
+      const { data: existingGeofence, error: verifyError } = await supabase
+        .from('geofences')
+        .select('id, user_id')
+        .eq('id', selectedGeofenceId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (verifyError || !existingGeofence) {
+        toast.error('You don\'t have permission to delete this zone.');
+        console.error('Geofence ownership verification failed:', verifyError);
+        return;
+      }
+
+      // Perform delete (RLS will also enforce ownership)
+      const { data: deletedData, error: deleteError } = await supabase
         .from('geofences')
         .delete()
-        .eq('id', geofenceId)
-        .eq('user_id', user?.id);
+        .eq('id', selectedGeofenceId)
+        .eq('user_id', user.id) // Explicit user filter
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      // Verify delete succeeded (0 rows = permission denied)
+      if (!deletedData) {
+        toast.error('You don\'t have permission to delete this zone.');
+        return;
+      }
       
       toast.success('Zone deleted successfully');
       await refetchGeofences();
-      navigate('/main');
+      
+      // Switch back to create mode
+      setMode('create');
+      setSelectedGeofenceId(null);
+      setSavedPolygon([]);
+      setCurrentPolygon([]);
+      setSearchParams({ mode: 'create' });
     } catch (error: any) {
       console.error('Delete geofence failed', error);
       toast.error('Unable to delete zone: ' + (error?.message || 'unknown error'));
@@ -287,23 +557,48 @@ export const DrawGeofence: React.FC = () => {
 
   // Prepare polygons for display
   const displayPolygon = savedPolygon.length > 0 ? savedPolygon : currentPolygon;
-  const polygons = displayPolygon.length >= 3 ? [{
+  
+  // Convert existing geofences to polygon format
+  const existingPolygons = useMemo(() => {
+    return geofences.map((geofence) => {
+      const coords = toLatLngArray(geofence.boundary_inner);
+      return {
+        coordinates: coords,
+        color: '#78A64A',
+        fillColor: '#78A64A',
+        fillOpacity: 0.2,
+        id: geofence.id,
+      };
+    });
+  }, [geofences]);
+
+  // Current drawing polygon
+  const drawingPolygon = displayPolygon.length >= 3 ? [{
     coordinates: displayPolygon,
-    color: '#78A64A',
-    fillColor: '#78A64A',
+    color: mode === 'edit' ? '#3FB7FF' : '#78A64A',
+    fillColor: mode === 'edit' ? '#3FB7FF' : '#78A64A',
     fillOpacity: 0.3,
+    id: selectedGeofenceId || 'drawing',
   }] : [];
+
+  // Combine existing and drawing polygons
+  const allPolygons = [...existingPolygons, ...drawingPolygon];
 
   // Prepare markers for polygon points
   const markers = displayPolygon.map((p, i) => ({
     position: p as [number, number],
-    color: '#F59E0B',
+    color: isMovingPoint && movingPointIndex === i ? '#FF0000' : '#F59E0B',
     label: `${i + 1}`,
   }));
 
+  const stopLeaflet = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <div className="h-full flex flex-col relative">
-      {/* Header - Match MapTab style */}
+      {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0">
         <h2
           className="text-white"
@@ -311,6 +606,9 @@ export const DrawGeofence: React.FC = () => {
         >
           Draw Your Safe Zone
         </h2>
+        {isValidating && (
+          <p className="text-xs mt-1 opacity-75">Validating geometry...</p>
+        )}
       </div>
 
       {/* Map */}
@@ -320,51 +618,68 @@ export const DrawGeofence: React.FC = () => {
           zoom={mapZoom}
           onZoomChange={setMapZoom}
           onMapClick={handleMapClick}
+          onPolygonClick={handlePolygonClick}
           onMarkerClick={handleMarkerClick}
-          polygons={polygons}
+          polygons={allPolygons}
           markers={markers}
+          selectedPolygonId={selectedGeofenceId}
           className="w-full h-full"
         />
 
-        {/* Floating Search Button (bottom-left) */}
-        <button
-          onClick={() => setShowSearchModal(true)}
-          className="absolute bottom-20 left-4 z-[1000] bg-white/50 hover:bg-white/70 p-3 rounded-lg shadow-lg transition-colors"
-          style={{ opacity: 0.5 }}
-        >
-          <Search className="w-5 h-5 text-[var(--deep-forest)]" />
-        </button>
+        {/* Floating buttons */}
+        <div className="absolute right-4 top-4 z-[5000] flex flex-col gap-3">
+          <button
+            onPointerDown={stopLeaflet}
+            onClick={(e) => {
+              stopLeaflet(e);
+              setShowSearchModal(true);
+            }}
+            className="bg-white/80 hover:bg-white p-3 rounded-lg shadow-lg transition-colors"
+            title="Search location"
+          >
+            <Search className="w-6 h-6 text-[var(--deep-forest)]" />
+          </button>
 
-        {/* Floating Current Location Button (bottom-right) */}
-        <button
-          onClick={handleUseCurrentLocation}
-          className="absolute bottom-20 right-4 z-[1000] bg-blue-500/50 hover:bg-blue-500/70 p-3 rounded-lg shadow-lg transition-colors"
-          style={{ opacity: 0.5 }}
-        >
-          <Navigation className="w-5 h-5 text-white" />
-        </button>
+          <button
+            onPointerDown={stopLeaflet}
+            onClick={(e) => {
+              stopLeaflet(e);
+              handleUseCurrentLocation();
+            }}
+            className="bg-blue-500/80 hover:bg-blue-500 p-3 rounded-lg shadow-lg transition-colors"
+            title="Use current location"
+          >
+            <Navigation className="w-6 h-6 text-[var(--deep-forest)]" />
+          </button>
+        </div>
 
-        {/* Point Deletion Popover - positioned near the marker */}
-        {selectedPointIndex !== null && selectedPointPosition && (
+        {/* Point Action Popover */}
+        {selectedPointIndex !== null && selectedPointPosition && !isMovingPoint && (
           <div 
             className="absolute z-[1001] bg-white rounded-lg shadow-xl p-2 border border-gray-200"
             style={{
-              // Position near the center of the map for now - in production, use Leaflet's latLngToContainerPoint
               left: '50%',
               top: '40%',
               transform: 'translate(-50%, -50%)',
             }}
           >
             <button
+              onClick={handleMovePoint}
+              className="flex items-center gap-2 px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded w-full"
+            >
+              <Move className="w-4 h-4" />
+              Move Point
+            </button>
+            <button
               onClick={() => {
                 handleDeletePoint(selectedPointIndex);
                 setSelectedPointIndex(null);
                 setSelectedPointPosition(null);
               }}
-              className="flex items-center gap-2 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded w-full"
+              className="flex items-center gap-2 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded w-full mt-1"
             >
               <X className="w-4 h-4" />
-              Delete point {selectedPointIndex + 1}
+              Delete
             </button>
             <button
               onClick={() => {
@@ -378,8 +693,8 @@ export const DrawGeofence: React.FC = () => {
           </div>
         )}
 
-        {/* Complete Polygon Button (if drawing) */}
-        {currentPolygon.length >= 3 && savedPolygon.length === 0 && (
+        {/* Complete Polygon Button */}
+        {currentPolygon.length >= 3 && savedPolygon.length === 0 && mode === 'create' && (
           <div className="absolute top-4 right-4 z-[1000]">
             <button
               onClick={handleCompletePolygon}
@@ -390,9 +705,9 @@ export const DrawGeofence: React.FC = () => {
           </div>
         )}
 
-        {/* Clear Button (if polygon exists) */}
+        {/* Clear Button */}
         {displayPolygon.length > 0 && (
-          <div className="absolute top-4 right-4 z-[1000]">
+          <div className="absolute bottom-4 left-4 z-[1000]">
             <button
               onClick={handleClearPolygon}
               className="bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2"
@@ -404,10 +719,10 @@ export const DrawGeofence: React.FC = () => {
         )}
       </div>
 
-      {/* Bottom Controls - Match MapTab style */}
+      {/* Bottom Controls */}
       <div className="bg-[var(--deep-forest)] p-4 shrink-0 space-y-3">
-        {/* Buffer slider (if polygon is saved) */}
-        {savedPolygon.length >= 3 && (
+        {/* Buffer slider (only in create mode) */}
+        {savedPolygon.length >= 3 && mode === 'create' && (
           <div className="bg-[var(--pine-green)] p-3 rounded-lg text-white">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm">Buffer (meters)</span>
@@ -426,7 +741,7 @@ export const DrawGeofence: React.FC = () => {
         )}
 
         {/* Delete Zone Button (edit mode only) */}
-        {mode === 'edit' && geofenceId && (
+        {mode === 'edit' && selectedGeofenceId && (
           <button
             onClick={handleDeleteZone}
             className="w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 flex items-center justify-center gap-2"
@@ -449,9 +764,9 @@ export const DrawGeofence: React.FC = () => {
             variant="primary" 
             onClick={handleSaveGeofence}
             className="flex-1"
-            disabled={displayPolygon.length < 3}
+            disabled={displayPolygon.length < 3 || isValidating}
           >
-            Save
+            {isValidating ? 'Validating...' : 'Save'}
           </GeoButton>
         </div>
       </div>

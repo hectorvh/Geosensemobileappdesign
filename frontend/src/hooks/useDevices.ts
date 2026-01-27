@@ -7,6 +7,10 @@ export interface Device {
   user_id: string;
   name?: string;
   animal_name?: string;
+  age?: number;
+  weight?: number;
+  batch_id?: string;
+  last_update?: string;
   animal_outside: boolean;
   active: boolean;
   speed: number;

@@ -1,8 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useAlerts, Alert } from '../../hooks/useAlerts';
-import { AlertTriangle, Battery, Activity, Clock } from 'lucide-react';
+import { AlertTriangle, Battery, Activity, Clock, Bell, ChevronRight } from 'lucide-react';
 import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
+
 
 export const AlertsTab: React.FC = () => {
   const { user } = useAuth();
@@ -54,6 +56,20 @@ export const AlertsTab: React.FC = () => {
   return (
     <div className="h-full bg-gray-50 overflow-y-auto">
       <div className="p-4 space-y-3">
+        {/* Set Alerts Box */}
+        <button
+          onClick={() => navigate('/customize-alerts')}
+          className="w-full bg-white rounded-lg p-4 text-left hover:bg-gray-50 transition-colors active:bg-gray-100 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bell className="w-6 h-6 text-[var(--accent-aqua)]" />
+              <h4 className="text-[var(--deep-forest)]">Set Alerts</h4>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          </div>
+        </button>
+        
         {alerts.length === 0 ? (
           <div className="text-center py-12">
             <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-3" />

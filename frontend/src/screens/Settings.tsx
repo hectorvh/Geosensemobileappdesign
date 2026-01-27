@@ -1,30 +1,49 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
-import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 import { ArrowLeft, User, MapPin, Smartphone, Bell, Globe, Ruler, LogOut } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
-  const { user, setUser } = useApp();
-  const [language, setLanguage] = useState(user?.language || 'EN');
-  const [units, setUnits] = useState(user?.units || 'km');
+  const { user, loading: authLoading, signOut } = useAuth();
+  const [language, setLanguage] = useState('EN');
+  const [units, setUnits] = useState('km');
 
   const handleSaveSettings = () => {
-    if (user) {
-      setUser({
-        ...user,
-        language: language as any,
-        units: units as any,
-      });
-    }
+    // TODO: Save language and units to user profile/settings if needed
+    // For now, just navigate back
     navigate('/main');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Are you sure you want to log out?')) {
-      setUser(null);
-      navigate('/');
+      // Reset tutorial_seen to FALSE before logout
+      if (user?.id) {
+        try {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ tutorial_seen: false })
+            .eq('id', user.id); // profiles.id = auth.users.id, RLS enforces auth.uid() = id
+          
+          if (updateError) {
+            // Log error but don't block logout
+            console.error('Error resetting tutorial_seen on logout:', updateError);
+          }
+        } catch (err) {
+          // Log error but don't block logout
+          console.error('Error resetting tutorial_seen on logout:', err);
+        }
+      }
+      
+      // Proceed with logout regardless of update result
+      const { error } = await signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+      } else {
+        navigate('/');
+      }
     }
   };
 
@@ -61,7 +80,13 @@ export const Settings: React.FC = () => {
           <div className="space-y-2">
             <div>
               <p className="text-sm text-gray-600">Email</p>
-              <p className="text-[var(--deep-forest)]">{user?.email || 'Not logged in'}</p>
+              {authLoading ? (
+                <p className="text-[var(--deep-forest)] text-sm opacity-50">Loading...</p>
+              ) : (
+                <p className="text-[var(--deep-forest)]">
+                  {user?.email || 'Not signed in'}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -77,7 +102,7 @@ export const Settings: React.FC = () => {
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
-            <span className="flex-1 text-left text-[var(--deep-forest)]">Edit zone</span>
+            <span className="flex-1 text-left text-[var(--deep-forest)]">Edit zones</span>
             <span className="text-gray-400">→</span>
           </button>
           
@@ -95,12 +120,32 @@ export const Settings: React.FC = () => {
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <Bell className="w-5 h-5 text-[var(--high-yellow)]" />
-            <span className="flex-1 text-left text-[var(--deep-forest)]">Change Alerts</span>
+            <span className="flex-1 text-left text-[var(--deep-forest)]">Set Alerts</span>
             <span className="text-gray-400">→</span>
           </button>
           
           <button
-            onClick={() => navigate('/tutorial')}
+            onClick={async () => {
+              // Reset tutorial_seen to FALSE so user can see tutorial again
+              if (user?.id) {
+                try {
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ tutorial_seen: false })
+                    .eq('id', user.id); // profiles.id = auth.users.id, RLS enforces auth.uid() = id
+                  
+                  if (updateError) {
+                    console.error('Error resetting tutorial_seen:', updateError);
+                    // Still navigate even if update fails
+                  }
+                } catch (err) {
+                  console.error('Error resetting tutorial_seen:', err);
+                  // Still navigate even if update fails
+                }
+              }
+              // Navigate to tutorial (optimistically, even if update fails)
+              navigate('/tutorial');
+            }}
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors"
           >
             <MapPin className="w-5 h-5 text-[var(--grass-green)]" />

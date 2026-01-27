@@ -10,7 +10,7 @@ export const AnalyticsTab: React.FC = () => {
   const { user } = useAuth();
   const { devices } = useDevices(user?.id);
   const { alerts } = useAlerts(user?.id, true);
-  const { locations } = useLiveLocations(5000);
+  const { locations } = useLiveLocations(user?.id, 5000);
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 

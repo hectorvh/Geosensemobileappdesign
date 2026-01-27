@@ -57,7 +57,7 @@ export const useAuth = () => {
       if (data) {
         setProfile(data);
       } else {
-        // Create profile if it doesn't exist
+        // Create profile if it doesn't exist (tutorial_seen defaults to false)
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({ id: userId })

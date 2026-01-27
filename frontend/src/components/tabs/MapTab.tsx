@@ -16,7 +16,7 @@ export const MapTab: React.FC = () => {
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [mapZoom, setMapZoom] = useState<number>(15);
   const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
-  const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(5000);
+  const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(user?.id, 5000);
   const { geofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
   const { alerts } = useAlerts(user?.id, true);
 
@@ -176,10 +176,17 @@ export const MapTab: React.FC = () => {
   }, [geofences]);
 
   // Handle polygon click
+  // SECURITY: Only allow selecting geofences from the user-filtered list
   const handlePolygonClick = (polygonIndex: number) => {
     const polygon = polygons[polygonIndex];
     if (polygon) {
-      setSelectedGeofenceId(polygon.id);
+      // Verify the geofence belongs to the current user
+      const geofence = geofences.find(g => g.id === polygon.id);
+      if (geofence && geofence.user_id === user?.id) {
+        setSelectedGeofenceId(polygon.id);
+      } else {
+        console.warn('Attempted to select geofence not owned by current user');
+      }
     }
   };
 

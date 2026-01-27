@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useDevices } from '../../hooks/useDevices';
 import { useAlerts } from '../../hooks/useAlerts';
-import { CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, Smartphone, ChevronRight } from 'lucide-react';
 import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
 
 export const HomeTab: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { devices } = useDevices(user?.id);
   const { alerts } = useAlerts(user?.id, true);
@@ -49,6 +51,20 @@ export const HomeTab: React.FC = () => {
         }}
       />
       <div className="space-y-4 max-w-md mx-auto">
+        {/* Manage Devices - Moved to top */}
+        <button
+          onClick={() => navigate('/link-devices')}
+          className="w-full bg-white/90 backdrop-blur-sm rounded-2xl p-5 text-left hover:bg-white transition-colors active:bg-white/95"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Smartphone className="w-6 h-6 text-[var(--accent-aqua)]" />
+              <h4 className="text-[var(--deep-forest)]">Manage Devices</h4>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          </div>
+        </button>
+        
         {/* Summary Cards */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-2">

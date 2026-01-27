@@ -1,38 +1,59 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import { MapPin, Smartphone, Bell } from 'lucide-react';
 import backgroundImage from '../assets/20250621-P1300279.jpg';
 
 export const Tutorial: React.FC = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
-  // Mark tutorial as seen when component mounts
-  useEffect(() => {
-    const markTutorialSeen = async () => {
-      if (user && profile) {
-        // Check if tutorial_seen flag exists in profile
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('tutorial_seen')
-          .eq('id', user.id)
-          .single();
+  // Mark tutorial as seen when user clicks Continue
+  const markTutorialSeen = async () => {
+    if (!user?.id) {
+      console.error('Cannot mark tutorial seen: user not found');
+      return;
+    }
 
-        if (!existingProfile?.tutorial_seen) {
-          // Update profile to mark tutorial as seen
-          await supabase
-            .from('profiles')
-            .update({ tutorial_seen: true })
-            .eq('id', user.id);
-        }
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ tutorial_seen: true })
+        .eq('id', user.id); // RLS ensures user can only update their own profile
+      // Note: profiles.id = auth.users.id (primary key, FK)
+
+      if (error) {
+        throw error;
       }
-    };
 
-    markTutorialSeen();
-  }, [user, profile]);
+      // Success - no toast needed, user is navigating away
+    } catch (error: any) {
+      console.error('Error marking tutorial seen:', error);
+      // Log error details (always log for debugging)
+      console.error('Supabase error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+      });
+      // Show toast in dev mode for debugging (check if we're in dev)
+      // Note: In production, errors are logged but don't show toast to avoid disrupting UX
+      // Don't block navigation on error - proceed anyway
+    }
+  };
+
+  const handleContinue = async () => {
+    await markTutorialSeen();
+    navigate('/draw-geofence?mode=create');
+  };
+
+  const handleSkip = () => {
+    // Skip doesn't mark tutorial as seen - user can see it again next time
+    navigate('/main');
+  };
 
   return (
     <div className="mobile-screen green-gradient-bg flex flex-col items-center justify-center px-6 py-8 relative">
@@ -89,7 +110,7 @@ export const Tutorial: React.FC = () => {
       <div className="space-y-3 w-full max-w-md relative z-10">
         <GeoButton 
           variant="primary" 
-          onClick={() => navigate('/draw-geofence?mode=create')}
+          onClick={handleContinue}
           className="w-full"
         >
           Continue
@@ -97,7 +118,7 @@ export const Tutorial: React.FC = () => {
         
         <GeoButton 
           variant="outline" 
-          onClick={() => navigate('/main')}
+          onClick={handleSkip}
           className="w-full"
         >
           Skip

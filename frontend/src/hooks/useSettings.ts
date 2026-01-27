@@ -4,9 +4,11 @@ import { supabase } from '../lib/supabase';
 export interface Settings {
   id: string;
   user_id: string;
-  inactivity_minutes: number;
-  low_battery_threshold: number;
+  inactivity_minutes?: number; // Deprecated, kept for migration compatibility
+  low_battery_threshold?: number; // Deprecated, kept for migration compatibility
   enable_out_of_range: boolean;
+  enable_inactiviy: boolean; // Note: matches DB column name exactly (with typo)
+  enable_low_battery: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -37,9 +39,9 @@ export const useSettings = (userId?: string) => {
             .from('settings')
             .insert({
               user_id: userId,
-              inactivity_minutes: 15,
-              low_battery_threshold: 15,
               enable_out_of_range: true,
+              enable_inactiviy: true,
+              enable_low_battery: true,
             })
             .select()
             .single();
@@ -63,7 +65,12 @@ export const useSettings = (userId?: string) => {
   };
 
   const updateSettings = async (updates: Partial<Settings>) => {
-    if (!userId || !settings) return { error: new Error('No user or settings') };
+    if (!userId) return { error: new Error('No user') };
+    
+    // If settings don't exist, create them first
+    if (!settings) {
+      await fetchSettings();
+    }
 
     try {
       const { data, error: updateError } = await supabase

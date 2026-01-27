@@ -26,17 +26,20 @@ export const useGeofences = (userId?: string) => {
   const fetchGeofences = async () => {
     try {
       setError(null);
-      let query = supabase
-        .from('geofences')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // Filter by user_id if provided
-      if (userId) {
-        query = query.eq('user_id', userId);
+      
+      // SECURITY: Always require userId - do not fetch geofences without user context
+      if (!userId) {
+        setGeofences([]);
+        setLoading(false);
+        return;
       }
 
-      const { data, error: fetchError } = await query;
+      // SECURITY: Explicitly filter by user_id (defense in depth - RLS also enforces this)
+      const { data, error: fetchError } = await supabase
+        .from('geofences')
+        .select('*')
+        .eq('user_id', userId) // Explicit user filter - required
+        .order('created_at', { ascending: false });
 
       if (fetchError) {
         throw fetchError;
@@ -56,6 +59,7 @@ export const useGeofences = (userId?: string) => {
     fetchGeofences();
 
     // Set up real-time subscription
+    // SECURITY: Filter subscription by user_id to only receive changes for current user's geofences
     const channel = supabase
       .channel('geofences_changes')
       .on(
@@ -64,6 +68,7 @@ export const useGeofences = (userId?: string) => {
           event: '*',
           schema: 'public',
           table: 'geofences',
+          filter: userId ? `user_id=eq.${userId}` : undefined, // Filter by user_id
         },
         () => {
           // Refetch when changes occur
