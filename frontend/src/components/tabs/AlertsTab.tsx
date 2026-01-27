@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useAlerts, Alert } from '../../hooks/useAlerts';
 import { AlertTriangle, Battery, Activity, Clock, Bell, ChevronRight } from 'lucide-react';
-import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
 
 
 export const AlertsTab: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { alerts, loading } = useAlerts(user?.id, true);
 
@@ -53,13 +53,20 @@ export const AlertsTab: React.FC = () => {
     );
   }
 
+  const handleSetAlertsClick = () => {
+    console.log('Set Alerts clicked'); // Debug log
+    navigate('/customize-alerts');
+  };
+
   return (
-    <div className="h-full bg-gray-50 overflow-y-auto">
-      <div className="p-4 space-y-3">
-        {/* Set Alerts Box */}
+    <div className="h-full bg-gray-50 overflow-y-auto relative">
+      <div className="p-4 space-y-3 relative z-10">
+        {/* Set Alerts Box - Rebuilt for reliability */}
         <button
-          onClick={() => navigate('/customize-alerts')}
-          className="w-full bg-white rounded-lg p-4 text-left hover:bg-gray-50 transition-colors active:bg-gray-100 shadow-sm"
+          type="button"
+          onClick={handleSetAlertsClick}
+          className="w-full bg-white rounded-lg p-4 text-left hover:bg-gray-50 transition-colors active:bg-gray-100 shadow-sm relative z-10 pointer-events-auto cursor-pointer"
+          style={{ touchAction: 'manipulation' }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
