@@ -90,7 +90,16 @@ export const HomeTab: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
+        <div
+          className={[
+            'bg-white/90 backdrop-blur-sm rounded-2xl p-5 transition-shadow transition-transform',
+            counts.activeAlerts > 0
+              ? 'border-2 border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.55)] animate-pulse'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <div className="flex items-center gap-3 mb-2">
             <AlertTriangle className="w-6 h-6 text-red-500" />
             <h3 className="text-[var(--deep-forest)]">Active Alerts</h3>
