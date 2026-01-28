@@ -16,7 +16,7 @@ export const MapTab: React.FC = () => {
   const { user } = useAuth();
   const [showRetry, setShowRetry] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
-  const [mapZoom, setMapZoom] = useState<number>(15);
+  const [mapZoom, setMapZoom] = useState<number>(19); // Maximum zoom level
   const [hasSavedViewport, setHasSavedViewport] = useState(false);
   const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(user?.id, 5000);
@@ -216,11 +216,12 @@ export const MapTab: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setMapCenter([pos.coords.latitude, pos.coords.longitude]);
-          setMapZoom(14); // Reasonable zoom level for user location
+          setMapZoom(19); // Maximum zoom level
         },
         () => {
           // Fallback default if geolocation fails/permission denied
           setMapCenter([51.969209, 7.595595]);
+          setMapZoom(19); // Maximum zoom level
         },
         { enableHighAccuracy: true, timeout: 5000 }
       );
@@ -229,10 +230,13 @@ export const MapTab: React.FC = () => {
 
     // Final fallback default if everything else fails
     setMapCenter([51.969209, 7.595595]);
+    setMapZoom(19); // Maximum zoom level
   }, [geofences, locations, mapCenter]);
 
   // Use the stored center or default
   const currentCenter = mapCenter || [51.969209, 7.595595];
+  // Ensure zoom is at maximum if not set from saved viewport
+  const currentZoom = mapZoom || 19;
 
   // Clear selection when clicking on map (not on polygon)
   const handleMapClick = () => {
@@ -458,7 +462,7 @@ export const MapTab: React.FC = () => {
       {/* Map */}
       <LeafletMap
         center={currentCenter}
-        zoom={mapZoom}
+        zoom={currentZoom}
         onViewportChange={handleViewportChange}
         onZoomChange={setMapZoom}
         onMapClick={handleMapClick}
