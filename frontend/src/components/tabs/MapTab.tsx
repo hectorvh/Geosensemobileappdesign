@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LeafletMap } from '../LeafletMap';
 import { GeoButton } from '../GeoButton';
-import { MapPin, Trash2, Edit, Loader2, Map, Mountain, Satellite, Layers } from 'lucide-react';
+import { MapPin, Trash2, Edit, Loader2, Map, Mountain, Satellite, Layers, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLiveLocations } from '../../hooks/useLiveLocations';
@@ -352,7 +352,12 @@ export const MapTab: React.FC = () => {
   // Handle edit zone
   const handleEditZone = () => {
     if (selectedGeofenceId) {
-      navigate(`/draw-geofence?mode=edit&id=${selectedGeofenceId}`);
+      navigate(`/draw-geofence?mode=edit&id=${selectedGeofenceId}`, {
+        state: {
+          mode: 'edit',
+          from: { pathname: '/main', mainTab: 'map' }
+        }
+      });
     }
   };
 
@@ -474,6 +479,27 @@ export const MapTab: React.FC = () => {
         basemap={activeBasemap}
         className="w-full h-full"
       />
+
+      {/* Draw Geofence Shortcut Button - Top Right */}
+      <div 
+        className="absolute bottom-4 right-4 pointer-events-auto"
+        style={{ zIndex: 2000 }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/draw-geofence?mode=create', {
+            state: {
+              mode: 'create',
+              from: { pathname: '/main', mainTab: 'map' }
+            }
+          })}
+          className="bg-[var(--grass-green)] hover:bg-[var(--pine-green)] text-white rounded-lg shadow-xl p-3 border-2 border-white transition-colors opacity-40 hover:opacity-50"
+          aria-label="Draw safe zone"
+          title="Draw safe zone"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Basemap Selector - Collapsible menu */}
       <div 

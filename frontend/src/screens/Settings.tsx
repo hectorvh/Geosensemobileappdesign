@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { useAuth } from '../hooks/useAuth';
+import { useApp } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, User, MapPin, Smartphone, Bell, Globe, Ruler, LogOut } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { setLastRoute, setLastMainTab } = useApp();
+  
+  // Track navigation state when Settings opens
+  useEffect(() => {
+    const fromState = (location.state as { from?: { pathname: string; mainTab?: string } })?.from;
+    if (fromState) {
+      setLastRoute(fromState.pathname);
+      if (fromState.mainTab) {
+        setLastMainTab(fromState.mainTab as any);
+      }
+    } else {
+      // Default: Settings was opened from /main
+      setLastRoute('/main');
+      setLastMainTab('home');
+    }
+  }, [location.state, setLastRoute, setLastMainTab]);
   const [language, setLanguage] = useState('EN');
   const [units, setUnits] = useState('km');
 
   const handleSaveSettings = () => {
     // TODO: Save language and units to user profile/settings if needed
-    // For now, just navigate back
-    navigate('/main');
+    // Navigate back to last screen/tab
+    const fromState = (location.state as { from?: { pathname: string; mainTab?: string } })?.from;
+    if (fromState?.pathname === '/main' && fromState.mainTab) {
+      navigate('/main', { state: { restoreTab: fromState.mainTab } });
+    } else if (fromState?.pathname) {
+      navigate(fromState.pathname);
+    } else {
+      navigate('/main', { state: { restoreTab: 'home' } });
+    }
   };
 
   const handleLogout = async () => {
@@ -61,7 +86,7 @@ export const Settings: React.FC = () => {
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center gap-3 shrink-0">
         <button
-          onClick={() => navigate('/main')}
+          onClick={handleSaveSettings}
           className="p-1 hover:bg-[var(--pine-green)] rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -95,9 +120,13 @@ export const Settings: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <button
             onClick={() => {
-              // Navigate to edit mode - will need to select a geofence
-              // For now, navigate to create mode, user can select from MapTab
-              navigate('/draw-geofence?mode=create');
+              // Navigate to edit mode - user can select geofence from MapTab
+              navigate('/draw-geofence?mode=edit', {
+                state: {
+                  mode: 'edit',
+                  from: { pathname: '/settings', mainTab: undefined }
+                }
+              });
             }}
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
@@ -107,7 +136,12 @@ export const Settings: React.FC = () => {
           </button>
           
           <button
-            onClick={() => navigate('/link-devices')}
+            onClick={() => navigate('/link-devices?mode=edit', {
+              state: {
+                mode: 'edit',
+                from: { pathname: '/settings', mainTab: undefined }
+              }
+            })}
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <Smartphone className="w-5 h-5 text-[var(--accent-aqua)]" />
@@ -116,7 +150,12 @@ export const Settings: React.FC = () => {
           </button>
           
           <button
-            onClick={() => navigate('/customize-alerts')}
+            onClick={() => navigate('/customize-alerts?mode=edit', {
+              state: {
+                mode: 'edit',
+                from: { pathname: '/settings', mainTab: undefined }
+              }
+            })}
             className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <Bell className="w-5 h-5 text-[var(--high-yellow)]" />

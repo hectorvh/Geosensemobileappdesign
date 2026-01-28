@@ -47,7 +47,12 @@ export const Tutorial: React.FC = () => {
 
   const handleContinue = async () => {
     await markTutorialSeen();
-    navigate('/draw-geofence?mode=create');
+    navigate('/draw-geofence?mode=create', {
+      state: {
+        mode: 'create',
+        from: { pathname: '/tutorial', mainTab: undefined }
+      }
+    });
   };
 
   const handleSkip = () => {

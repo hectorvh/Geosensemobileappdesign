@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { GeoInput } from '../components/GeoInput';
 import { useAuth } from '../hooks/useAuth';
 import { useDevices } from '../hooks/useDevices';
+import { useApp } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,8 +12,27 @@ import backgroundImage from '../assets/P1260790-2.jpg';
 
 export const LinkDevices: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { devices, loading: devicesLoading, refetch: refetchDevices } = useDevices(user?.id);
+  const { navigateBackToLast, setLastRoute, setLastMainTab } = useApp();
+  
+  // Get mode from URL params, default to 'create'
+  const mode = (searchParams.get('mode') || 'create') as 'create' | 'edit';
+  
+  // Get navigation state from location
+  const fromState = (location.state as { from?: { pathname: string; mainTab?: string } })?.from;
+  
+  // Track navigation state
+  useEffect(() => {
+    if (fromState) {
+      setLastRoute(fromState.pathname);
+      if (fromState.mainTab) {
+        setLastMainTab(fromState.mainTab as any);
+      }
+    }
+  }, [fromState, setLastRoute, setLastMainTab]);
   
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -233,7 +253,7 @@ export const LinkDevices: React.FC = () => {
           className="mb-2"
           style={{ fontWeight: 700, fontSize: '1.4rem' }}
         >
-          Link Your Devices
+          {mode === 'create' ? 'Add Device' : 'Edit Devices'}
         </h2>
         <p className="text-sm opacity-90">Assign GPS trackers to each animal</p>
       </div>
@@ -390,20 +410,32 @@ export const LinkDevices: React.FC = () => {
       {/* Bottom Buttons */}
       <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
-          <GeoButton 
-            variant="outline" 
-            onClick={() => navigate('/draw-geofence')}
-            className="flex-1"
-          >
-            Back
-          </GeoButton>
-          <GeoButton 
-            variant="primary" 
-            onClick={() => navigate('/customize-alerts')}
-            className="flex-1"
-          >
-            Next
-          </GeoButton>
+          {mode === 'create' ? (
+            <>
+              <GeoButton 
+                variant="outline" 
+                onClick={() => navigate('/draw-geofence', { state: { mode: 'create', from: { pathname: '/link-devices', mainTab: undefined } } })}
+                className="flex-1"
+              >
+                Back
+              </GeoButton>
+              <GeoButton 
+                variant="primary" 
+                onClick={() => navigate('/customize-alerts', { state: { mode: 'create', from: { pathname: '/link-devices', mainTab: undefined } } })}
+                className="flex-1"
+              >
+                Continue
+              </GeoButton>
+            </>
+          ) : (
+            <GeoButton 
+              variant="outline" 
+              onClick={() => navigateBackToLast(navigate)}
+              className="flex-1"
+            >
+              Back
+            </GeoButton>
+          )}
         </div>
       </div>
     </div>

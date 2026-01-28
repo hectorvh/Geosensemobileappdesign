@@ -64,7 +64,7 @@ export const AlertNotifier: React.FC = () => {
       case 'Out of Range':
       case 'out':
       case 'out_of_zone':
-        return 'Animal has left the geofence area';
+        return 'Animal has left the safety area';
       case 'Low Battery':
         return 'Device battery is below 15%';
       case 'Inactivity Detected':

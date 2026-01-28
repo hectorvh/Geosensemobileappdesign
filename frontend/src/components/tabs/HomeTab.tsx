@@ -93,7 +93,12 @@ export const HomeTab: React.FC = () => {
       <div className="space-y-4 max-w-md mx-auto">
         {/* Manage Devices - Moved to top */}
         <button
-          onClick={() => navigate('/link-devices')}
+          onClick={() => navigate('/link-devices?mode=edit', {
+            state: {
+              mode: 'edit',
+              from: { pathname: '/main', mainTab: 'home' }
+            }
+          })}
           className="w-full bg-white/90 backdrop-blur-sm rounded-2xl p-5 text-left hover:bg-white transition-colors active:bg-white/95"
         >
           <div className="flex items-center justify-between">
@@ -120,7 +125,7 @@ export const HomeTab: React.FC = () => {
             <AlertTriangle className="w-6 h-6 text-red-500" />
             <h3 className="text-[var(--deep-forest)]">Active Alerts</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{counts.activeAlerts} alerts</p>
+          <p className="text-[var(--deep-forest)]">{counts.activeAlerts} Alerts</p>
           {counts.activeAlerts > 0 && (
             <p className="text-sm text-red-600 mt-1">
               Requires your attention
@@ -134,7 +139,7 @@ export const HomeTab: React.FC = () => {
             <CheckCircle2 className="w-6 h-6 text-[var(--grass-green)]" />
             <h3 className="text-[var(--deep-forest)]">Animals Inside</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{counts.animalsInside} animals</p>
+          <p className="text-[var(--deep-forest)]">{counts.animalsInside} Animals</p>
         </div>
 
         {/* Animals Outside */}

@@ -48,6 +48,11 @@ export interface User {
 
 export type MainTab = 'home' | 'map' | 'alerts' | 'analytics';
 
+export interface NavigationState {
+  pathname: string;
+  mainTab?: MainTab;
+}
+
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
@@ -67,6 +72,11 @@ interface AppContextType {
   removeGeofence: (id: string) => void;
   activeMainTab: MainTab;
   setActiveMainTab: (tab: MainTab) => void;
+  lastRoute: string | null;
+  lastMainTab: MainTab | null;
+  setLastRoute: (route: string | null) => void;
+  setLastMainTab: (tab: MainTab | null) => void;
+  navigateBackToLast: (navigate: (path: string, options?: { state?: any }) => void) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -82,6 +92,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     inactivity: true,
   });
   const [activeMainTab, setActiveMainTab] = useState<MainTab>('home');
+  const [lastRoute, setLastRoute] = useState<string | null>(null);
+  const [lastMainTab, setLastMainTab] = useState<MainTab | null>(null);
+
+  const navigateBackToLast = (navigate: (path: string, options?: { state?: any }) => void) => {
+    if (lastRoute) {
+      // If last route was /main, restore the tab
+      if (lastRoute === '/main' && lastMainTab) {
+        navigate('/main', { state: { restoreTab: lastMainTab } });
+      } else {
+        navigate(lastRoute);
+      }
+    } else {
+      // Default fallback to home tab
+      navigate('/main', { state: { restoreTab: 'home' } });
+    }
+  };
 
   const addDevice = (device: Device) => {
     setDevices((prev) => [...prev, device]);
@@ -132,6 +158,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         removeGeofence,
         activeMainTab,
         setActiveMainTab,
+        lastRoute,
+        lastMainTab,
+        setLastRoute,
+        setLastMainTab,
+        navigateBackToLast,
       }}
     >
       {children}

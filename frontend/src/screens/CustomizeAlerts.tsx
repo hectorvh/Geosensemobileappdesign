@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { GeoButton } from '../components/GeoButton';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
 import { useGeofences } from '../hooks/useGeofences';
+import { useApp } from '../contexts/AppContext';
 import { Switch } from '../components/ui/switch';
 import { AlertTriangle, Battery, Activity, MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -12,9 +13,28 @@ import backgroundImage from '../assets/P1260790-2.jpg';
 
 export const CustomizeAlerts: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { settings, updateSettings, loading: settingsLoading } = useSettings(user?.id);
   const { geofences, loading: geofencesLoading } = useGeofences(user?.id);
+  const { navigateBackToLast, setLastRoute, setLastMainTab } = useApp();
+  
+  // Get mode from URL params or location state, default to 'create'
+  const mode = (searchParams.get('mode') || (location.state as { mode?: string })?.mode || 'create') as 'create' | 'edit';
+  
+  // Get navigation state from location
+  const fromState = (location.state as { from?: { pathname: string; mainTab?: string } })?.from;
+  
+  // Track navigation state
+  useEffect(() => {
+    if (fromState) {
+      setLastRoute(fromState.pathname);
+      if (fromState.mainTab) {
+        setLastMainTab(fromState.mainTab as any);
+      }
+    }
+  }, [fromState, setLastRoute, setLastMainTab]);
   
   // Alert settings state (from Supabase settings table)
   const [outOfRange, setOutOfRange] = useState(true);
@@ -70,11 +90,24 @@ export const CustomizeAlerts: React.FC = () => {
       }
       
       toast.success('Settings saved successfully');
-      navigate('/main');
+      
+      // Navigate based on mode
+      if (mode === 'create') {
+        // Create mode: Continue goes to MainApp HomeTab
+        navigate('/main', { state: { restoreTab: 'home' } });
+      } else {
+        // Edit mode: navigate back to last screen/tab
+        navigateBackToLast(navigate);
+      }
     } catch (error: any) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save settings');
     }
+  };
+
+  const handleDiscard = () => {
+    // Edit mode: Discard goes back without saving
+    navigateBackToLast(navigate);
   };
 
   return (
@@ -93,7 +126,7 @@ export const CustomizeAlerts: React.FC = () => {
           className="mb-2"
           style={{ fontWeight: 700, fontSize: '1.4rem' }}
         >
-          Customize Your Alerts
+          {mode === 'create' ? 'Create Alerts' : 'Edit Alerts'}
         </h2>
         <p className="text-sm opacity-90">Choose which notifications you want to receive</p>
       </div>
@@ -243,21 +276,43 @@ export const CustomizeAlerts: React.FC = () => {
       {/* Bottom Buttons */}
       <div className="bg-[var(--deep-forest)] p-3 space-y-2 shrink-0 relative z-10">
         <div className="flex gap-2">
-          <GeoButton 
-            variant="outline" 
-            onClick={() => navigate('/link-devices')}
-            className="flex-1"
-          >
-            Back
-          </GeoButton>
-          <GeoButton 
-            variant="primary" 
-            onClick={handleSaveSettings}
-            className="flex-1"
-            disabled={settingsLoading}
-          >
-            Save
-          </GeoButton>
+          {mode === 'create' ? (
+            <>
+              <GeoButton 
+                variant="outline" 
+                onClick={() => navigate('/link-devices', { state: { mode: 'create', from: { pathname: '/customize-alerts', mainTab: undefined } } })}
+                className="flex-1"
+              >
+                Back
+              </GeoButton>
+              <GeoButton 
+                variant="primary" 
+                onClick={handleSaveSettings}
+                className="flex-1"
+                disabled={settingsLoading}
+              >
+                Continue
+              </GeoButton>
+            </>
+          ) : (
+            <>
+              <GeoButton 
+                variant="outline" 
+                onClick={handleDiscard}
+                className="flex-1"
+              >
+                Discard
+              </GeoButton>
+              <GeoButton 
+                variant="primary" 
+                onClick={handleSaveSettings}
+                className="flex-1"
+                disabled={settingsLoading}
+              >
+                Save
+              </GeoButton>
+            </>
+          )}
         </div>
       </div>
     </div>

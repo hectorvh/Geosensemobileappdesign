@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import * as turf from '@turf/turf';
 import { LeafletMap } from '../components/LeafletMap';
 import { GeoButton } from '../components/GeoButton';
 import { useAuth } from '../hooks/useAuth';
 import { useGeofences } from '../hooks/useGeofences';
+import { useApp } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { Search, Navigation, X, Trash2, Move } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,9 +21,14 @@ interface ViewportState {
 
 export const DrawGeofence: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { geofences, refetch: refetchGeofences } = useGeofences(user?.id);
+  const { navigateBackToLast, setLastRoute, setLastMainTab } = useApp();
+  
+  // Get navigation state from location
+  const fromState = (location.state as { from?: { pathname: string; mainTab?: string } })?.from;
   
   // State machine: 'create' | 'edit'
   const [mode, setMode] = useState<'create' | 'edit'>('create');
@@ -30,7 +36,7 @@ export const DrawGeofence: React.FC = () => {
   
   // Map state
   const [mapCenter, setMapCenter] = useState<[number, number]>([51.969205, 7.595761]);
-  const [mapZoom, setMapZoom] = useState<number>(15);
+  const [mapZoom, setMapZoom] = useState<number>(17); // Maximum zoom level
   
   // Polygon state
   const [currentPolygon, setCurrentPolygon] = useState<LatLng[]>([]);
@@ -73,11 +79,19 @@ export const DrawGeofence: React.FC = () => {
     }
   }, [mapCenter, mapZoom]);
 
-  // Initialize from URL params
+  // Initialize from URL params and track navigation state
   // SECURITY: Verify ownership when loading from URL params
   useEffect(() => {
     const urlMode = searchParams.get('mode') || 'create';
     const urlId = searchParams.get('id') ? parseInt(searchParams.get('id')!) : null;
+    
+    // Track current route for navigation memory
+    if (fromState) {
+      setLastRoute(fromState.pathname);
+      if (fromState.mainTab) {
+        setLastMainTab(fromState.mainTab as any);
+      }
+    }
     
     if (urlMode === 'edit' && urlId && user?.id) {
       // Verify the geofence belongs to the current user
@@ -96,10 +110,10 @@ export const DrawGeofence: React.FC = () => {
       }
       // If geofences are still loading, wait for them to load
     } else {
-      setMode('create');
+      setMode(urlMode as 'create' | 'edit');
       setSelectedGeofenceId(null);
     }
-  }, [searchParams, geofences, user?.id, setSearchParams]);
+  }, [searchParams, geofences, user?.id, setSearchParams, fromState, setLastRoute, setLastMainTab]);
 
   // Load selected geofence for editing
   // SECURITY: Only allow editing geofences from the user-filtered list
@@ -214,6 +228,7 @@ export const DrawGeofence: React.FC = () => {
         (position) => {
           const { latitude, longitude } = position.coords;
           setMapCenter([latitude, longitude]);
+          setMapZoom(17); // Maximum zoom level
         },
         (error) => {
           toast.error('Unable to get current location. Please enable location permissions.');
@@ -375,11 +390,18 @@ export const DrawGeofence: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (!hasCompletedOnboarding) {
-      navigate('/link-devices');
+    if (mode === 'create') {
+      // Create mode: Back goes to Tutorial
+      navigate('/tutorial');
     } else {
-      navigate('/main');
+      // Edit mode: Back goes to last screen/tab
+      navigateBackToLast(navigate);
     }
+  };
+
+  const handleDiscard = () => {
+    // Edit mode: Discard goes back without saving
+    navigateBackToLast(navigate);
   };
 
   const handleSaveGeofence = async () => {
@@ -468,7 +490,8 @@ export const DrawGeofence: React.FC = () => {
         
         toast.success('Zone updated successfully');
         await refetchGeofences();
-        navigate('/main');
+        // Edit mode: navigate back to last screen/tab
+        navigateBackToLast(navigate);
       } else {
         const { data, error } = await supabase
           .from('geofences')
@@ -487,11 +510,8 @@ export const DrawGeofence: React.FC = () => {
         toast.success('Zone saved successfully');
         await refetchGeofences();
         
-        if (!hasCompletedOnboarding) {
-          navigate('/link-devices');
-        } else {
-          navigate('/main');
-        }
+        // Create mode: Continue goes to LinkDevices
+        navigate('/link-devices', { state: { mode: 'create', from: { pathname: '/draw-geofence', mainTab: undefined } } });
       }
     } catch (error: any) {
       console.error('Save geofence failed', error);
@@ -604,7 +624,7 @@ export const DrawGeofence: React.FC = () => {
           className="text-white"
           style={{ fontWeight: 700, fontSize: '1.4rem' }}
         >
-          Draw Your Safe Zone
+          {mode === 'create' ? 'Create Zone' : 'Edit Zone'}
         </h2>
         {isValidating && (
           <p className="text-xs mt-1 opacity-75">Validating geometry...</p>
@@ -707,13 +727,12 @@ export const DrawGeofence: React.FC = () => {
 
         {/* Clear Button */}
         {displayPolygon.length > 0 && (
-          <div className="absolute bottom-4 left-4 z-[1000]">
+          <div className="absolute bottom-4 right-4 z-[1000]">
             <button
-              onClick={handleClearPolygon}
-              className="bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2"
+              onClick={handleDeleteZone}
+              className="bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg flex items-center opacity-50"
             >
-              <Trash2 className="w-4 h-4" />
-              Clear
+              <Trash2 className="w-5 h-5" />
             </button>
           </div>
         )}
@@ -740,34 +759,45 @@ export const DrawGeofence: React.FC = () => {
           </div>
         )}
 
-        {/* Delete Zone Button (edit mode only) */}
-        {mode === 'edit' && selectedGeofenceId && (
-          <button
-            onClick={handleDeleteZone}
-            className="w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 flex items-center justify-center gap-2"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete zone
-          </button>
-        )}
-
         {/* Action Buttons */}
         <div className="flex gap-2">
-          <GeoButton 
-            variant="outline" 
-            onClick={handleBack}
-            className="flex-1"
-          >
-            Back
-          </GeoButton>
-          <GeoButton 
-            variant="primary" 
-            onClick={handleSaveGeofence}
-            className="flex-1"
-            disabled={displayPolygon.length < 3 || isValidating}
-          >
-            {isValidating ? 'Validating...' : 'Save'}
-          </GeoButton>
+          {mode === 'create' ? (
+            <>
+              <GeoButton 
+                variant="outline" 
+                onClick={handleBack}
+                className="flex-1"
+              >
+                Back
+              </GeoButton>
+              <GeoButton 
+                variant="primary" 
+                onClick={handleSaveGeofence}
+                className="flex-1"
+                disabled={displayPolygon.length < 3 || isValidating}
+              >
+                {isValidating ? 'Validating...' : 'Continue'}
+              </GeoButton>
+            </>
+          ) : (
+            <>
+              <GeoButton 
+                variant="outline" 
+                onClick={handleDiscard}
+                className="flex-1"
+              >
+                Discard
+              </GeoButton>
+              <GeoButton 
+                variant="primary" 
+                onClick={handleSaveGeofence}
+                className="flex-1"
+                disabled={displayPolygon.length < 3 || isValidating}
+              >
+                {isValidating ? 'Validating...' : 'Save'}
+              </GeoButton>
+            </>
+          )}
         </div>
       </div>
 

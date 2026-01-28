@@ -47,7 +47,7 @@ export const AlertsTab: React.FC = () => {
       case 'Out of Range':
       case 'out':
       case 'out_of_zone':
-        return 'Animal has left the geofence area';
+        return 'Animal has left the safety area';
       case 'Low Battery':
         return 'Device battery is below 15%';
       case 'Inactivity Detected':
@@ -81,7 +81,12 @@ export const AlertsTab: React.FC = () => {
 
   const handleSetAlertsClick = () => {
     console.log('Set Alerts clicked'); // Debug log
-    navigate('/customize-alerts');
+    navigate('/customize-alerts?mode=edit', {
+      state: {
+        mode: 'edit',
+        from: { pathname: '/main', mainTab: 'alerts' }
+      }
+    });
   };
 
   return (
