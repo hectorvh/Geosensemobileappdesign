@@ -23,6 +23,7 @@ export const MapTab: React.FC = () => {
 
   const geolocationRequestedRef = React.useRef(false);
   const saveViewportTimeoutRef = React.useRef<number | null>(null);
+  const isRestoringViewportRef = React.useRef(false);
 
   const LAST_VIEWPORT_KEY = 'MapTab:lastViewport';
 
@@ -73,10 +74,26 @@ export const MapTab: React.FC = () => {
         typeof parsed.zoom === 'number'
       ) {
         const [lat, lng] = parsed.center;
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        // Validate: lat/lng must be finite and within valid bounds
+        if (
+          Number.isFinite(lat) &&
+          Number.isFinite(lng) &&
+          lat >= -90 &&
+          lat <= 90 &&
+          lng >= -180 &&
+          lng <= 180 &&
+          Number.isFinite(parsed.zoom) &&
+          parsed.zoom >= 0 &&
+          parsed.zoom <= 20
+        ) {
+          isRestoringViewportRef.current = true;
           setMapCenter([lat, lng]);
           setMapZoom(parsed.zoom);
           setHasSavedViewport(true);
+          // Reset flag after a short delay to allow map to restore
+          setTimeout(() => {
+            isRestoringViewportRef.current = false;
+          }, 1000);
         }
       }
     } catch (err) {
@@ -93,11 +110,34 @@ export const MapTab: React.FC = () => {
     };
   }, []);
 
+  // Explicitly persist the latest viewport when leaving MapTab (component unmount)
+  React.useEffect(() => {
+    return () => {
+      if (typeof window === 'undefined') return;
+      if (!mapCenter) return;
+      try {
+        window.localStorage.setItem(
+          LAST_VIEWPORT_KEY,
+          JSON.stringify({ center: mapCenter, zoom: mapZoom })
+        );
+      } catch (err) {
+        console.error('Failed to save map viewport on exit:', err);
+      }
+    };
+    // We register the cleanup with current center/zoom so the latest values are saved on exit
+  }, [mapCenter, mapZoom]);
+
   // Persist viewport whenever map moves/zooms (debounced)
+  // IMPORTANT: Do NOT save during initial restore to avoid overwriting with restore values
   const handleViewportChange = React.useCallback(
     (center: [number, number], zoom: number) => {
       setMapCenter(center);
       setMapZoom(zoom);
+
+      // Prevent saving during initial restore
+      if (isRestoringViewportRef.current) {
+        return;
+      }
 
       if (typeof window === 'undefined') return;
 
@@ -105,6 +145,7 @@ export const MapTab: React.FC = () => {
         window.clearTimeout(saveViewportTimeoutRef.current);
       }
 
+      // Debounce saves to avoid excessive writes (500ms)
       saveViewportTimeoutRef.current = window.setTimeout(() => {
         try {
           window.localStorage.setItem(
@@ -144,10 +185,10 @@ export const MapTab: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setMapCenter([pos.coords.latitude, pos.coords.longitude]);
-          setMapZoom(14);
+          setMapZoom(14); // Reasonable zoom level for user location
         },
         () => {
-          // Fallback default if geolocation fails
+          // Fallback default if geolocation fails/permission denied
           setMapCenter([51.969209, 7.595595]);
         },
         { enableHighAccuracy: true, timeout: 5000 }

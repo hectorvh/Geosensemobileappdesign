@@ -4,6 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDevices } from '../../hooks/useDevices';
 import { useAlerts } from '../../hooks/useAlerts';
 import { CheckCircle2, AlertTriangle, Clock, Smartphone, ChevronRight } from 'lucide-react';
+import { useGeofences } from '../../hooks/useGeofences';
+import { useLiveLocations } from '../../hooks/useLiveLocations';
 import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
 
 export const HomeTab: React.FC = () => {
@@ -11,6 +13,8 @@ export const HomeTab: React.FC = () => {
   const { user } = useAuth();
   const { devices } = useDevices(user?.id);
   const { alerts } = useAlerts(user?.id, true);
+  const { geofences } = useGeofences(user?.id);
+  const { locations } = useLiveLocations(user?.id, 5000);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   useEffect(() => {
@@ -23,19 +27,55 @@ export const HomeTab: React.FC = () => {
 
   // Calculate counts according to requirements:
   // - Active Alerts: count of alerts where active = true
-  // - Animals Outside: count of devices where animal_outside = true AND active = true
-  // - Animals Inside: count of devices where animal_outside = false AND active = true
+  // - Animals Outside: count of devices that are active (green/red markers) AND have active alert (red markers)
+  //   i.e. live_location_active = true AND has_active_alert = true
+  // - Animals Inside: count of devices that are active (green markers) AND have no active alert
+  //   i.e. live_location_active = true AND has_active_alert = false
+  // - Active Geofences: number of geofences rows for this user_id
+  // - Devices Inactive: number of trackers shown as inactive (grey marker),
+  //   i.e. live_location_active = false (updated_at older than threshold)
   const counts = useMemo(() => {
     const activeAlertsCount = alerts.filter((a) => a.active).length;
-    const animalsOutside = devices.filter((d) => d.animal_outside && d.active).length;
-    const animalsInside = devices.filter((d) => !d.animal_outside && d.active).length;
-    
+    const activeGeofences = geofences.length;
+
+    // Compute counts based on live_locations, same rules as MapTab markers
+    const now = new Date();
+    let animalsOutside = 0; // Active AND has alert (red markers)
+    let animalsInside = 0; // Active AND no alert (green markers)
+    let inactiveDevices = 0; // Inactive (grey markers)
+
+    locations.forEach((location) => {
+      const updatedAt = new Date(location.updated_at);
+      const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
+      const live_location_active = secondsSinceUpdate <= 30;
+
+      // Check if this tracker has any active alerts
+      const hasActiveAlert = alerts.some(
+        (a) => a.active && a.device?.tracker_id === location.tracker_id
+      );
+
+      if (live_location_active) {
+        if (hasActiveAlert) {
+          // Red marker: active but has alert (out of zone)
+          animalsOutside += 1;
+        } else {
+          // Green marker: active and no alert (inside zone)
+          animalsInside += 1;
+        }
+      } else {
+        // Grey marker: inactive
+        inactiveDevices += 1;
+      }
+    });
+
     return {
       activeAlerts: activeAlertsCount,
       animalsOutside,
       animalsInside,
+      activeGeofences,
+      inactiveDevices,
     };
-  }, [devices, alerts]);
+  }, [devices, alerts, geofences, locations]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -65,31 +105,7 @@ export const HomeTab: React.FC = () => {
           </div>
         </button>
         
-        {/* Summary Cards */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle2 className="w-6 h-6 text-[var(--grass-green)]" />
-            <h3 className="text-[var(--deep-forest)]">Animals Inside</h3>
-          </div>
-          <p className="text-[var(--deep-forest)]">{counts.animalsInside} animals</p>
-          <p className="text-sm text-gray-600 mt-1">
-            All animals are within the safe zone
-          </p>
-        </div>
-
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <AlertTriangle className="w-6 h-6 text-orange-500" />
-            <h3 className="text-[var(--deep-forest)]">Animals Outside</h3>
-          </div>
-          <p className="text-[var(--deep-forest)]">{counts.animalsOutside} animals</p>
-          {counts.animalsOutside > 0 && (
-            <p className="text-sm text-orange-600 mt-1">
-              Check map for details
-            </p>
-          )}
-        </div>
-
+        {/* Active Alerts */}
         <div
           className={[
             'bg-white/90 backdrop-blur-sm rounded-2xl p-5 transition-shadow transition-transform',
@@ -112,6 +128,52 @@ export const HomeTab: React.FC = () => {
           )}
         </div>
 
+        {/* Animals Inside */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
+          <div className="flex items-center gap-3 mb-2">
+            <CheckCircle2 className="w-6 h-6 text-[var(--grass-green)]" />
+            <h3 className="text-[var(--deep-forest)]">Animals Inside</h3>
+          </div>
+          <p className="text-[var(--deep-forest)]">{counts.animalsInside} animals</p>
+        </div>
+
+        {/* Animals Outside */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
+          <div className="flex items-center gap-3 mb-2">
+            <AlertTriangle className="w-6 h-6 text-orange-500" />
+            <h3 className="text-[var(--deep-forest)]">Animals Outside</h3>
+          </div>
+          <p className="text-[var(--deep-forest)]">{counts.animalsOutside} Animals</p>
+          {counts.animalsOutside > 0 && (
+            <p className="text-sm text-orange-600 mt-1">
+              Check map for details
+            </p>
+          )}
+        </div>
+
+        {/* Devices Inactive (grey markers) */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
+          <div className="flex items-center gap-3 mb-2">
+            <AlertTriangle className="w-6 h-6 text-gray-500" />
+            <h3 className="text-[var(--deep-forest)]">Devices Inactive</h3>
+          </div>
+          <p className="text-[var(--deep-forest)]">
+            {counts.inactiveDevices} Devices without recent location updates
+          </p>
+        </div>
+
+        {/* Active Zones */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
+          <div className="flex items-center gap-3 mb-2">
+            <CheckCircle2 className="w-6 h-6 text-[var(--accent-aqua)]" />
+            <h3 className="text-[var(--deep-forest)]">Active Zones</h3>
+          </div>
+          <p className="text-[var(--deep-forest)]">
+            {counts.activeGeofences} Zones currently defined for your herd
+          </p>
+        </div>
+
+        {/* Last Update */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-2">
             <Clock className="w-6 h-6 text-[var(--accent-aqua)]" />
@@ -123,34 +185,9 @@ export const HomeTab: React.FC = () => {
           </p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <h4 className="text-[var(--deep-forest)] mb-3">Quick Stats</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Animals:</span>
-              <span className="text-[var(--deep-forest)]">{devices.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Active Geofences:</span>
-              <span className="text-[var(--deep-forest)]">1</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Battery Average:</span>
-              <span className="text-[var(--deep-forest)]">
-                {devices.length > 0 && devices.some(d => d.battery_level)
-                  ? Math.round(
-                      devices
-                        .filter(d => d.battery_level)
-                        .reduce((acc, d) => acc + (d.battery_level || 0), 0) / 
-                      devices.filter(d => d.battery_level).length
-                    )
-                  : 0}
-                %
-              </span>
-            </div>
-          </div>
-        </div>
+ 
+
+
       </div>
     </div>
   );

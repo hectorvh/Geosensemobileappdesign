@@ -9,7 +9,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export const AnalyticsTab: React.FC = () => {
   const { user } = useAuth();
   const { devices } = useDevices(user?.id);
-  const { alerts } = useAlerts(user?.id, true);
+  // Fetch all alerts for this user (not only active) so we can
+  // 1) count total alerts for this user_id
+  // 2) still derive active-alert state per tracker
+  const { alerts } = useAlerts(user?.id, false);
   const { locations } = useLiveLocations(user?.id, 5000);
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -47,28 +50,49 @@ export const AnalyticsTab: React.FC = () => {
     setExpandedDevice(expandedDevice === deviceId ? null : deviceId);
   };
 
-  // Calculate herd statistics according to requirements:
-  // - Active Animals: count devices where active = true
-  // - Inactive Animals: count devices where active = false
-  // - Alerts Today: count alerts where active = true AND created_at is today
+  // Calculate herd statistics:
+  // - Active Animals: number of trackers currently shown as active (green markers)
+  //   i.e. live_location_active = true AND no active alert for that tracker.
+  // - Inactive Animals: number of trackers currently shown as inactive (grey markers)
+  //   i.e. live_location_active = false.
+  // - Alerts: total number of alert records for the current user_id.
   const stats = useMemo(() => {
-    const activeAnimals = devices.filter((d) => d.active).length;
-    const inactiveAnimals = devices.filter((d) => !d.active).length;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const alertsToday = alerts.filter((a) => {
-      const alertDate = new Date(a.created_at);
-      alertDate.setHours(0, 0, 0, 0);
-      return alertDate.getTime() === today.getTime() && a.active;
-    }).length;
+    let activeAnimals = 0;
+    let inactiveAnimals = 0;
+
+    const now = new Date();
+
+    locations.forEach((location) => {
+      const updatedAt = new Date(location.updated_at);
+      const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
+
+      // Same rule as MapTab marker coloring
+      const live_location_active = secondsSinceUpdate <= 30;
+
+      // Check if this tracker has any active alerts
+      const hasActiveAlert = alerts.some(
+        (a) => a.active && a.device?.tracker_id === location.tracker_id
+      );
+
+      if (live_location_active && !hasActiveAlert) {
+        // Green marker (active, no alert)
+        activeAnimals += 1;
+      } else if (!live_location_active) {
+        // Grey marker (inactive)
+        inactiveAnimals += 1;
+      }
+      // Red markers (live_location_active && hasActiveAlert) are not counted
+      // into Active/Inactive boxes per the requirement wording.
+    });
+
+    const alertsCount = alerts.length;
 
     return {
       activeAnimals,
       inactiveAnimals,
-      alertsToday,
+      alertsCount,
     };
-  }, [devices, alerts]);
+  }, [locations, alerts]);
 
   return (
     <div className="h-full bg-gray-50 overflow-y-auto">
@@ -90,8 +114,8 @@ export const AnalyticsTab: React.FC = () => {
               </p>
             </div>
             <div className="bg-red-50 rounded-lg p-3 col-span-2">
-              <p className="text-sm text-gray-600">Alerts Today</p>
-              <p className="text-[var(--deep-forest)]">{stats.alertsToday}</p>
+              <p className="text-sm text-gray-600">Total Alerts</p>
+              <p className="text-[var(--deep-forest)]">{stats.alertsCount}</p>
             </div>
           </div>
         </div>

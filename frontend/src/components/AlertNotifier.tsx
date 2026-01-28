@@ -22,7 +22,7 @@ export const AlertNotifier: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setActiveMainTab } = useApp();
+  const { activeMainTab, setActiveMainTab } = useApp();
 
   const [current, setCurrent] = useState<RawAlert | null>(null);
   const queueRef = useRef<RawAlert[]>([]);
@@ -30,7 +30,9 @@ export const AlertNotifier: React.FC = () => {
   const lastShownRef = useRef<Record<string, number>>({});
   const timeoutRef = useRef<number | null>(null);
 
-  const isOnAlertsTab = location.pathname === '/main';
+  // We only want to suppress popups when the user is actually viewing
+  // the Alerts tab inside the main app, not for all '/main' routes.
+  const isOnAlertsTab = location.pathname === '/main' && activeMainTab === 'alerts';
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -106,12 +108,6 @@ export const AlertNotifier: React.FC = () => {
     if (!alert.id) return;
     if (!alert.active) return; // only notify on active alerts
 
-    // Only show popup for out-of-range style alerts
-    const type = (alert.type_alert || '').toLowerCase();
-    if (type !== 'out' && type !== 'out_of_zone') {
-      return;
-    }
-
     // Optional: suppress popups while user is already browsing Alerts tab
     if (isOnAlertsTab) return;
 
@@ -129,9 +125,18 @@ export const AlertNotifier: React.FC = () => {
   };
 
   useEffect(() => {
+    // Debug: confirm global mount and current route/tab
+    // eslint-disable-next-line no-console
+    console.log('[AlertNotifier] Mounted. route=', location.pathname, 'activeMainTab=', activeMainTab, 'user=', user?.id ?? 'none');
+
     if (!user?.id) {
+      // eslint-disable-next-line no-console
+      console.log('[AlertNotifier] No user, skipping alerts subscription.');
       return;
     }
+
+    // eslint-disable-next-line no-console
+    console.log('[AlertNotifier] Subscribing to Realtime alerts for user:', user.id);
 
     const channel = supabase
       .channel(`global-alerts-${user.id}`)
@@ -144,18 +149,31 @@ export const AlertNotifier: React.FC = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
+          // eslint-disable-next-line no-console
+          console.log('[AlertNotifier] Realtime payload received:', payload);
+
           const row = (payload as any).new as RawAlert | null;
           if (!row) return;
 
-          // Only react to INSERT/UPDATE, and only for this user (filter already enforces)
+          // Only react to INSERT/UPDATE
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            // eslint-disable-next-line no-console
+            console.log('[AlertNotifier] Handling event', payload.eventType, 'for alert id=', row.id, 'type_alert=', row.type_alert, 'active=', row.active);
             enqueueAlert(row);
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('[AlertNotifier] Ignoring event type', payload.eventType);
           }
         }
       )
       .subscribe();
 
+    // eslint-disable-next-line no-console
+    console.log('[AlertNotifier] Subscription topic:', channel.topic);
+
     return () => {
+      // eslint-disable-next-line no-console
+      console.log('[AlertNotifier] Cleaning up subscription for user:', user.id);
       supabase.removeChannel(channel);
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
@@ -205,8 +223,7 @@ export const AlertNotifier: React.FC = () => {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h4 className="text-sm font-semibold text-[var(--deep-forest)]">
-                  {/* Fixed text per requirements */}
-                  Alert: out of range
+                  {`Alert: ${getTitle(current.type_alert)}`}
                 </h4>
                 <p className="text-xs text-gray-600 mt-0.5">
                   {getDescription(current.type_alert)}

@@ -199,6 +199,9 @@ export const LeafletMap: React.FC<MapProps> = ({
         weight: isSelected ? 4 : 3,
       }).addTo(mapInstanceRef.current!);
 
+      // Ensure polygons stay visually below markers
+      leafletPolygon.bringToBack();
+
       // Add click handler for polygon
       if (onPolygonClick) {
         leafletPolygon.on('click', () => {
@@ -245,6 +248,9 @@ export const LeafletMap: React.FC<MapProps> = ({
         fillOpacity: 1,
       }).addTo(mapInstanceRef.current!);
 
+      // Ensure markers are always drawn above polygons
+      circleMarker.bringToFront();
+
       // Add click handler for marker
       if (onMarkerClick) {
         circleMarker.on('click', () => {
@@ -264,6 +270,7 @@ export const LeafletMap: React.FC<MapProps> = ({
   }, [markers, onMarkerClick]);
 
   // Auto-fit bounds once if requested and no saved viewport is being used
+  // Uses dynamic padding to achieve ~70% window occupancy (15% padding on each side)
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     if (!autoFitBounds) return;
@@ -271,19 +278,32 @@ export const LeafletMap: React.FC<MapProps> = ({
 
     const bounds = L.latLngBounds([]);
 
+    // Include ALL geofence polygons
     polygons.forEach((polygon) => {
       polygon.coordinates.forEach(([lat, lng]) => {
         bounds.extend([lat, lng]);
       });
     });
 
+    // Include ALL device marker positions
     markers.forEach((marker) => {
       bounds.extend(marker.position);
     });
 
     if (bounds.isValid()) {
+      // Calculate dynamic padding based on map container size
+      // Target: ~70% occupancy = 15% padding on each side
+      const container = mapInstanceRef.current.getContainer();
+      const containerWidth = container.clientWidth || 800; // fallback
+      const containerHeight = container.clientHeight || 600; // fallback
+
+      // 15% of container size on each side
+      const padX = Math.round(containerWidth * 0.15);
+      const padY = Math.round(containerHeight * 0.15);
+
       mapInstanceRef.current.fitBounds(bounds, {
-        padding: [50, 50],
+        paddingTopLeft: [padY, padX],
+        paddingBottomRight: [padY, padX],
         maxZoom: 17,
       } as L.FitBoundsOptions);
       hasAutoFittedRef.current = true;
