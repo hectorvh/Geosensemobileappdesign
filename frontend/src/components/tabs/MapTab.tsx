@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { LeafletMap } from '../LeafletMap';
 import { GeoButton } from '../GeoButton';
-import { MapPin, Trash2, Edit, Loader2, Map, Mountain, Satellite, Layers, Plus } from 'lucide-react';
+import { MapPin, Trash2, Edit, Loader2, Map, Mountain, Satellite, Layers, Plus, Search, Navigation } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLiveLocations } from '../../hooks/useLiveLocations';
 import { useGeofences } from '../../hooks/useGeofences';
 import { useAlerts } from '../../hooks/useAlerts';
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 type BasemapType = 'street' | 'terrain' | 'satellite';
 
@@ -45,6 +46,8 @@ export const MapTab: React.FC = () => {
   });
 
   const [isBasemapMenuOpen, setIsBasemapMenuOpen] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleBasemapChange = (basemap: BasemapType) => {
     setActiveBasemap(basemap);
@@ -241,6 +244,36 @@ export const MapTab: React.FC = () => {
   // Clear selection when clicking on map (not on polygon)
   const handleMapClick = () => {
     setSelectedGeofenceId(null);
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setMapCenter([latitude, longitude]);
+          setMapZoom(15); // Adjusted zoom level for better location context
+        },
+        (error) => {
+          toast.error('Unable to get current location. Please enable location permissions.');
+        }
+      );
+    } else {
+      toast.error('Geolocation is not supported by your browser.');
+    }
+  };
+
+  const handleSearchLocation = async () => {
+    if (!searchQuery.trim()) return;
+    
+    toast.info('Geocoding service will be implemented soon');
+    setShowSearchModal(false);
+    setSearchQuery('');
+  };
+
+  const stopLeaflet = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const getMarkerColor = (status: string) => {
@@ -480,7 +513,36 @@ export const MapTab: React.FC = () => {
         className="w-full h-full"
       />
 
-      {/* Draw Geofence Shortcut Button - Top Right */}
+      {/* Floating buttons - Search and Current Location */}
+      <div className="absolute right-4 top-4 z-[5000] pointer-events-auto">
+        <div className="bg-[var(--grass-green)]/90 backdrop-blur-sm rounded-lg p-1 shadow-lg flex flex-col gap-2">
+          <button
+            onPointerDown={stopLeaflet}
+            onClick={(e) => {
+              stopLeaflet(e);
+              setShowSearchModal(true);
+            }}
+            className="bg-white/90 hover:bg-white p-3 rounded-lg transition-colors"
+            title="Search location"
+          >
+            <Search className="w-4 h-4 text-[var(--deep-forest)]" />
+          </button>
+
+          <button
+            onPointerDown={stopLeaflet}
+            onClick={(e) => {
+              stopLeaflet(e);
+              handleUseCurrentLocation();
+            }}
+            className="bg-white/90 hover:bg-white p-3 rounded-lg transition-colors"
+            title="Use current location"
+          >
+            <Navigation className="w-4 h-4 text-[var(--deep-forest)]" />
+          </button>
+        </div>
+      </div>
+
+      {/* Draw Geofence Shortcut Button - Bottom Right */}
       <div 
         className="absolute bottom-4 right-4 pointer-events-auto"
         style={{ zIndex: 2000 }}
@@ -600,6 +662,40 @@ export const MapTab: React.FC = () => {
             <GeoButton variant="outline" onClick={() => setShowRetry(false)} className="w-full">
               Close
             </GeoButton>
+          </div>
+        </div>
+      )}
+
+      {/* Search Modal */}
+      {showSearchModal && (
+        <div className="absolute inset-0 bg-black/50 z-[2000] flex items-end">
+          <div className="bg-white w-full p-4 rounded-t-2xl">
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Search place or address"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchLocation()}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--grass-green)]"
+                autoFocus
+              />
+              <button
+                onClick={() => setShowSearchModal(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+            <button
+              onClick={handleSearchLocation}
+              className="w-full bg-[var(--grass-green)] text-white px-4 py-2 rounded-lg"
+            >
+              Search
+            </button>
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              TODO: Geocoding service integration
+            </p>
           </div>
         </div>
       )}

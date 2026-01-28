@@ -647,31 +647,35 @@ export const DrawGeofence: React.FC = () => {
         />
 
         {/* Floating buttons */}
-        <div className="absolute right-4 top-4 z-[5000] flex flex-col gap-3">
-          <button
-            onPointerDown={stopLeaflet}
-            onClick={(e) => {
-              stopLeaflet(e);
-              setShowSearchModal(true);
-            }}
-            className="bg-white/80 hover:bg-white p-3 rounded-lg shadow-lg transition-colors"
-            title="Search location"
-          >
-            <Search className="w-6 h-6 text-[var(--deep-forest)]" />
-          </button>
+        <div className="absolute right-4 top-4 z-[5000] pointer-events-auto">
+          <div className="bg-[var(--grass-green)]/90 backdrop-blur-sm rounded-lg p-1 shadow-lg flex flex-col gap-2">
+            <button
+              onPointerDown={stopLeaflet}
+              onClick={(e) => {
+                stopLeaflet(e);
+                setShowSearchModal(true);
+              }}
+              className="bg-white/90 hover:bg-white p-3 rounded-lg transition-colors"
+              title="Search location"
+            >
+              <Search className="w-4 h-4 text-[var(--deep-forest)]" />
+            </button>
 
-          <button
-            onPointerDown={stopLeaflet}
-            onClick={(e) => {
-              stopLeaflet(e);
-              handleUseCurrentLocation();
-            }}
-            className="bg-blue-500/80 hover:bg-blue-500 p-3 rounded-lg shadow-lg transition-colors"
-            title="Use current location"
-          >
-            <Navigation className="w-6 h-6 text-[var(--deep-forest)]" />
-          </button>
+            <button
+              onPointerDown={stopLeaflet}
+              onClick={(e) => {
+                stopLeaflet(e);
+                handleUseCurrentLocation();
+              }}
+              className="bg-white/90 hover:bg-white p-3 rounded-lg transition-colors"
+              title="Use current location"
+            >
+              <Navigation className="w-4 h-4 text-[var(--deep-forest)]" />
+            </button>
+          </div>
         </div>
+
+        
 
         {/* Point Action Popover */}
         {selectedPointIndex !== null && selectedPointPosition && !isMovingPoint && (
