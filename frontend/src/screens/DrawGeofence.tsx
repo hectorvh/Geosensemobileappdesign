@@ -9,6 +9,7 @@ import { useApp } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { Search, Navigation, X, Trash2, Move } from 'lucide-react';
 import { toast } from 'sonner';
+import logo from '../assets/logo.png';
 
 type LatLng = [number, number];
 
@@ -620,12 +621,20 @@ export const DrawGeofence: React.FC = () => {
     <div className="h-full flex flex-col relative">
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0">
-        <h2
-          className="text-white"
-          style={{ fontWeight: 700, fontSize: '1.4rem' }}
-        >
-          {mode === 'create' ? 'Create Zone' : 'Edit Zone'}
-        </h2>
+        <div className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="GeoSense logo" 
+            className="w-6 h-6"
+            style={{ objectFit: 'contain' }}
+          />
+          <h2
+            className="text-white"
+            style={{ fontWeight: 700, fontSize: '1.4rem' }}
+          >
+            {mode === 'create' ? 'Create Zone' : 'Edit Zone'}
+          </h2>
+        </div>
         {isValidating && (
           <p className="text-xs mt-1 opacity-75">Validating geometry...</p>
         )}

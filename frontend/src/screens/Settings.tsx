@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, User, MapPin, Smartphone, Bell, Globe, Ruler, LogOut } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -91,7 +92,15 @@ export const Settings: React.FC = () => {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h3>Settings</h3>
+        <div className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="GeoSense logo" 
+            className="w-6 h-6"
+            style={{ objectFit: 'contain' }}
+          />
+          <h3>Settings</h3>
+        </div>
       </div>
 
       {/* Content */}

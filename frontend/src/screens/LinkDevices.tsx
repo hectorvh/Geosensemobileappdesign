@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import backgroundImage from '../assets/P1260790-2.jpg';
+import logo from '../assets/logo.png';
 
 export const LinkDevices: React.FC = () => {
   const navigate = useNavigate();
@@ -249,12 +250,19 @@ export const LinkDevices: React.FC = () => {
       
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 shrink-0 relative z-10">
-        <h2
-          className="mb-2"
-          style={{ fontWeight: 700, fontSize: '1.4rem' }}
-        >
-          {mode === 'create' ? 'Add Device' : 'Edit Devices'}
-        </h2>
+        <div className="flex items-center gap-2 mb-2">
+          <img 
+            src={logo} 
+            alt="GeoSense logo" 
+            className="w-6 h-6"
+            style={{ objectFit: 'contain' }}
+          />
+          <h2
+            style={{ fontWeight: 700, fontSize: '1.4rem' }}
+          >
+            {mode === 'create' ? 'Add Device' : 'Edit Devices'}
+          </h2>
+        </div>
         <p className="text-sm opacity-90">Assign GPS trackers to each animal</p>
       </div>
 
