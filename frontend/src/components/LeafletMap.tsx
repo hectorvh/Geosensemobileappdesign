@@ -6,6 +6,7 @@ interface MapProps {
   zoom: number;
   onMapClick?: (lat: number, lng: number) => void;
   onZoomChange?: (zoom: number) => void;
+  onViewportChange?: (center: [number, number], zoom: number) => void;
   onPolygonClick?: (polygonIndex: number) => void;
   onMarkerClick?: (markerIndex: number) => void;
   polygons?: Array<{
@@ -23,6 +24,11 @@ interface MapProps {
   }>;
   selectedPolygonId?: string | number | null;
   className?: string;
+  /**
+   * If true and no saved viewport exists, automatically fit bounds
+   * to polygons + markers once on initial render.
+   */
+  autoFitBounds?: boolean;
 }
 
 export const LeafletMap: React.FC<MapProps> = ({
@@ -30,12 +36,14 @@ export const LeafletMap: React.FC<MapProps> = ({
   zoom,
   onMapClick,
   onZoomChange,
+  onViewportChange,
   onPolygonClick,
   onMarkerClick,
   polygons = [],
   markers = [],
   selectedPolygonId,
   className = '',
+  autoFitBounds = false,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -44,10 +52,12 @@ export const LeafletMap: React.FC<MapProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const onMapClickRef = useRef<MapProps["onMapClick"]>(onMapClick);
   const onZoomChangeRef = useRef<MapProps["onZoomChange"]>(onZoomChange);
+  const onViewportChangeRef = useRef<MapProps["onViewportChange"]>(onViewportChange);
   const onPolygonClickRef = useRef<MapProps["onPolygonClick"]>(onPolygonClick);
   const onMarkerClickRef = useRef<MapProps["onMarkerClick"]>(onMarkerClick);
   const currentZoomRef = useRef<number>(zoom);
   const isUserInteractionRef = useRef<boolean>(false);
+  const hasAutoFittedRef = useRef<boolean>(false);
 
 
   // Initialize map
@@ -84,12 +94,23 @@ export const LeafletMap: React.FC<MapProps> = ({
         currentZoomRef.current = newZoom;
         isUserInteractionRef.current = true;
         onZoomChangeRef.current?.(newZoom);
+        const centerLatLng = mapInstanceRef.current.getCenter();
+        onViewportChangeRef.current?.(
+          [centerLatLng.lat, centerLatLng.lng],
+          newZoom
+        );
       }
     });
 
-    // Track drag/pan to detect user interaction
-    map.on('dragend', () => {
-      isUserInteractionRef.current = true;
+    // Track drag/pan to detect user interaction and notify viewport change
+    map.on('moveend', () => {
+      if (mapInstanceRef.current) {
+        isUserInteractionRef.current = true;
+        const c = mapInstanceRef.current.getCenter();
+        const z = mapInstanceRef.current.getZoom();
+        currentZoomRef.current = z;
+        onViewportChangeRef.current?.([c.lat, c.lng], z);
+      }
     });
 
     mapInstanceRef.current = map;
@@ -112,6 +133,11 @@ export const LeafletMap: React.FC<MapProps> = ({
   useEffect(() => {
     onZoomChangeRef.current = onZoomChange;
   }, [onZoomChange]);
+
+  // Update viewport change callback
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
 
   // Track initial mount
   const isInitialMountRef = useRef(true);
@@ -236,6 +262,33 @@ export const LeafletMap: React.FC<MapProps> = ({
       markerLayersRef.current.push(circleMarker);
     });
   }, [markers, onMarkerClick]);
+
+  // Auto-fit bounds once if requested and no saved viewport is being used
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    if (!autoFitBounds) return;
+    if (hasAutoFittedRef.current) return;
+
+    const bounds = L.latLngBounds([]);
+
+    polygons.forEach((polygon) => {
+      polygon.coordinates.forEach(([lat, lng]) => {
+        bounds.extend([lat, lng]);
+      });
+    });
+
+    markers.forEach((marker) => {
+      bounds.extend(marker.position);
+    });
+
+    if (bounds.isValid()) {
+      mapInstanceRef.current.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: 17,
+      } as L.FitBoundsOptions);
+      hasAutoFittedRef.current = true;
+    }
+  }, [polygons, markers, autoFitBounds]);
 
   useEffect(() => {
     onMapClickRef.current = onMapClick;

@@ -15,8 +15,8 @@ type RawAlert = {
   updated_at: string;
 };
 
-const AUTO_DISMISS_MS = 6000;
-const DEDUPE_WINDOW_MS = 3000;
+const AUTO_DISMISS_MS = 5000;
+const DEDUPE_WINDOW_MS = 10000;
 
 export const AlertNotifier: React.FC = () => {
   const { user } = useAuth();
@@ -105,6 +105,12 @@ export const AlertNotifier: React.FC = () => {
   const enqueueAlert = (alert: RawAlert) => {
     if (!alert.id) return;
     if (!alert.active) return; // only notify on active alerts
+
+    // Only show popup for out-of-range style alerts
+    const type = (alert.type_alert || '').toLowerCase();
+    if (type !== 'out' && type !== 'out_of_zone') {
+      return;
+    }
 
     // Optional: suppress popups while user is already browsing Alerts tab
     if (isOnAlertsTab) return;
@@ -199,7 +205,8 @@ export const AlertNotifier: React.FC = () => {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h4 className="text-sm font-semibold text-[var(--deep-forest)]">
-                  {getTitle(current.type_alert)}
+                  {/* Fixed text per requirements */}
+                  Alert: out of range
                 </h4>
                 <p className="text-xs text-gray-600 mt-0.5">
                   {getDescription(current.type_alert)}

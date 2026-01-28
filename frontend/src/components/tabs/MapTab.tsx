@@ -15,10 +15,16 @@ export const MapTab: React.FC = () => {
   const [showRetry, setShowRetry] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [mapZoom, setMapZoom] = useState<number>(15);
+  const [hasSavedViewport, setHasSavedViewport] = useState(false);
   const [selectedGeofenceId, setSelectedGeofenceId] = useState<number | null>(null);
   const { locations, loading: locationsLoading, error: locationsError } = useLiveLocations(user?.id, 5000);
   const { geofences, loading: geofencesLoading, error: geofencesError } = useGeofences(user?.id);
   const { alerts } = useAlerts(user?.id, true);
+
+  const geolocationRequestedRef = React.useRef(false);
+  const saveViewportTimeoutRef = React.useRef<number | null>(null);
+
+  const LAST_VIEWPORT_KEY = 'MapTab:lastViewport';
 
   type LatLng = [number, number];
 
@@ -53,27 +59,104 @@ export const MapTab: React.FC = () => {
     return [];
   }
 
-
-
-  // Set initial map center only once when data is first loaded
+  // Load last saved viewport from localStorage on mount
   React.useEffect(() => {
-    if (mapCenter === null) {
-      // Only set initial center if we don't have one yet
-      if (geofences.length > 0) {
-        const coords = toLatLngArray(geofences[0].boundary_inner);
-        if (coords.length > 0) {
-          setMapCenter(coords[0]);
-          return;
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(LAST_VIEWPORT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        Array.isArray(parsed.center) &&
+        parsed.center.length === 2 &&
+        typeof parsed.zoom === 'number'
+      ) {
+        const [lat, lng] = parsed.center;
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          setMapCenter([lat, lng]);
+          setMapZoom(parsed.zoom);
+          setHasSavedViewport(true);
         }
       }
-      // Use first live location if available
-      if (locations.length > 0) {
-        setMapCenter([locations[0].lat, locations[0].lng]);
+    } catch (err) {
+      console.error('Failed to load last map viewport:', err);
+    }
+  }, []);
+
+  // Cleanup debounced save timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (saveViewportTimeoutRef.current !== null) {
+        window.clearTimeout(saveViewportTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Persist viewport whenever map moves/zooms (debounced)
+  const handleViewportChange = React.useCallback(
+    (center: [number, number], zoom: number) => {
+      setMapCenter(center);
+      setMapZoom(zoom);
+
+      if (typeof window === 'undefined') return;
+
+      if (saveViewportTimeoutRef.current !== null) {
+        window.clearTimeout(saveViewportTimeoutRef.current);
+      }
+
+      saveViewportTimeoutRef.current = window.setTimeout(() => {
+        try {
+          window.localStorage.setItem(
+            LAST_VIEWPORT_KEY,
+            JSON.stringify({ center, zoom })
+          );
+        } catch (err) {
+          console.error('Failed to save map viewport:', err);
+        }
+      }, 500);
+    },
+    []
+  );
+
+  // Set initial map center only once when data is first loaded and no saved viewport
+  React.useEffect(() => {
+    if (mapCenter !== null) return;
+
+    // Prefer geofence polygons
+    if (geofences.length > 0) {
+      const coords = toLatLngArray(geofences[0].boundary_inner);
+      if (coords.length > 0) {
+        setMapCenter(coords[0]);
         return;
       }
-      // Default center
-      setMapCenter([51.969209, 7.595595]);
     }
+
+    // Next: first live location if available
+    if (locations.length > 0) {
+      setMapCenter([locations[0].lat, locations[0].lng]);
+      return;
+    }
+
+    // If no geofences and no locations, try user geolocation once
+    if (!geolocationRequestedRef.current && typeof navigator !== 'undefined' && navigator.geolocation) {
+      geolocationRequestedRef.current = true;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setMapCenter([pos.coords.latitude, pos.coords.longitude]);
+          setMapZoom(14);
+        },
+        () => {
+          // Fallback default if geolocation fails
+          setMapCenter([51.969209, 7.595595]);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+      return;
+    }
+
+    // Final fallback default if everything else fails
+    setMapCenter([51.969209, 7.595595]);
   }, [geofences, locations, mapCenter]);
 
   // Use the stored center or default
@@ -284,12 +367,14 @@ export const MapTab: React.FC = () => {
       <LeafletMap
         center={currentCenter}
         zoom={mapZoom}
+        onViewportChange={handleViewportChange}
         onZoomChange={setMapZoom}
         onMapClick={handleMapClick}
         onPolygonClick={handlePolygonClick}
         polygons={polygons}
         markers={markers}
         selectedPolygonId={selectedGeofenceId}
+        autoFitBounds={!hasSavedViewport}
         className="w-full h-full"
       />
 
