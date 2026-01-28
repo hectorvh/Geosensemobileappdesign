@@ -5,6 +5,10 @@ export interface LiveLocation {
   tracker_id: string;
   lat: number;
   lng: number;
+  geom?: {
+    type: 'Point';
+    coordinates: [number, number]; // [lng, lat] in GeoJSON format
+  } | null;
   accuracy_m: number | null;
   speed_mps: number | null;
   heading_deg: number | null;
@@ -38,7 +42,7 @@ export const useLiveLocations = (userId?: string, pollInterval: number = 5000) =
       try {
         const { data, error: fetchError } = await supabase
           .from('user_live_locations')
-          .select('tracker_id, lat, lng, accuracy_m, speed_mps, heading_deg, altitude_m, captured_at, updated_at, is_high_accuracy')
+          .select('tracker_id, lat, lng, geom, accuracy_m, speed_mps, heading_deg, altitude_m, captured_at, updated_at, is_high_accuracy')
           .order('updated_at', { ascending: false });
         
         if (fetchError) {
@@ -50,7 +54,7 @@ export const useLiveLocations = (userId?: string, pollInterval: number = 5000) =
         // RLS will still enforce security - users can only see locations for linked trackers
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('live_locations')
-          .select('*')
+          .select('tracker_id, lat, lng, geom, accuracy_m, speed_mps, heading_deg, altitude_m, captured_at, updated_at, is_high_accuracy')
           .order('updated_at', { ascending: false });
 
         if (fallbackError) {

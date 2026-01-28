@@ -327,52 +327,72 @@ export const MapTab: React.FC = () => {
   // - red: live_location_active = true AND has_active_alert = true
   // - grey: live_location_active = false
   const markers = useMemo(() => {
-    return locations.map((location) => {
-      const updatedAt = new Date(location.updated_at);
-      const now = new Date();
-      const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
-      
-      // Determine if location is active (updated within last 1 minute)
-      const live_location_active = secondsSinceUpdate <= 30;
-      
-      // Check if device has active alert
-      // Find device by tracker_id, then check if it has active alerts
-      const deviceAlerts = alerts.filter((alert) => {
-        // We need to match by device_id, but we only have tracker_id
-        // For now, we'll check if any alert's device tracker_id matches
-        return alert.device?.tracker_id === location.tracker_id;
-      });
-      const has_active_alert = deviceAlerts.length > 0;
-      
-      // Determine marker color based on rules
-      let color = '#9CA3AF'; // Grey (default - inactive)
-      if (live_location_active) {
-        if (has_active_alert) {
-          color = '#EF4444'; // Red: active but has alert
-        } else {
-          color = '#78A64A'; // Green: active and no alert
+    return locations
+      .filter((location) => {
+        // Only include locations with valid geometry or lat/lng fallback
+        return location.geom || (location.lat != null && location.lng != null);
+      })
+      .map((location) => {
+        const updatedAt = new Date(location.updated_at);
+        const now = new Date();
+        const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
+        
+        // Determine if location is active (updated within last 1 minute)
+        const live_location_active = secondsSinceUpdate <= 30;
+        
+        // Check if device has active alert
+        // Find device by tracker_id, then check if it has active alerts
+        const deviceAlerts = alerts.filter((alert) => {
+          // We need to match by device_id, but we only have tracker_id
+          // For now, we'll check if any alert's device tracker_id matches
+          return alert.device?.tracker_id === location.tracker_id;
+        });
+        const has_active_alert = deviceAlerts.length > 0;
+        
+        // Determine marker color based on rules
+        let color = '#9CA3AF'; // Grey (default - inactive)
+        if (live_location_active) {
+          if (has_active_alert) {
+            color = '#EF4444'; // Red: active but has alert
+          } else {
+            color = '#78A64A'; // Green: active and no alert
+          }
         }
-      }
 
-      // Build popup content
-      const popupContent = `
-        <div style="padding: 8px;">
-          <strong>Tracker: ${location.tracker_id}</strong><br/>
-          <small>Updated: ${updatedAt.toLocaleString()}</small><br/>
-          <small>Status: ${live_location_active ? 'Active' : 'Inactive'}</small><br/>
-          ${has_active_alert ? '<small style="color: red;">⚠ Has Active Alert</small><br/>' : ''}
-          ${location.speed_mps !== null ? `<small>Speed: ${(location.speed_mps * 3.6).toFixed(1)} km/h</small><br/>` : ''}
-          ${location.accuracy_m !== null ? `<small>Accuracy: ${location.accuracy_m.toFixed(1)}m</small>` : ''}
-        </div>
-      `;
+        // Extract lat/lng from geometry (GeoJSON Point format: [lng, lat])
+        // Fallback to lat/lng columns if geom is not available
+        let markerLat: number;
+        let markerLng: number;
+        
+        if (location.geom && location.geom.type === 'Point' && Array.isArray(location.geom.coordinates)) {
+          // GeoJSON Point coordinates are [lng, lat]
+          markerLng = location.geom.coordinates[0];
+          markerLat = location.geom.coordinates[1];
+        } else {
+          // Fallback to lat/lng columns
+          markerLat = location.lat;
+          markerLng = location.lng;
+        }
 
-      return {
-        position: [location.lat, location.lng] as [number, number],
-        color,
-        label: `Tracker ${location.tracker_id}`,
-        popup: popupContent,
-      };
-    });
+        // Build popup content
+        const popupContent = `
+          <div style="padding: 8px;">
+            <strong>Tracker: ${location.tracker_id}</strong><br/>
+            <small>Updated: ${updatedAt.toLocaleString()}</small><br/>
+            <small>Status: ${live_location_active ? 'Active' : 'Inactive'}</small><br/>
+            ${has_active_alert ? '<small style="color: red;">⚠ Has Active Alert</small><br/>' : ''}
+            ${location.speed_mps !== null ? `<small>Speed: ${(location.speed_mps * 3.6).toFixed(1)} km/h</small><br/>` : ''}
+            ${location.accuracy_m !== null ? `<small>Accuracy: ${location.accuracy_m.toFixed(1)}m</small>` : ''}
+          </div>
+        `;
+
+        return {
+          position: [markerLat, markerLng] as [number, number],
+          color,
+          label: `Tracker ${location.tracker_id}`,
+          popup: popupContent,
+        };
+      });
   }, [locations, alerts]);
 
 
