@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { LeafletMap } from '../LeafletMap';
 import { GeoButton } from '../GeoButton';
-import { MapPin, Trash2, Edit, Loader2 } from 'lucide-react';
+import { MapPin, Trash2, Edit, Loader2, Map, Mountain, Satellite, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLiveLocations } from '../../hooks/useLiveLocations';
 import { useGeofences } from '../../hooks/useGeofences';
 import { useAlerts } from '../../hooks/useAlerts';
 import { supabase } from '../../lib/supabase';
+
+type BasemapType = 'street' | 'terrain' | 'satellite';
 
 export const MapTab: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +28,35 @@ export const MapTab: React.FC = () => {
   const isRestoringViewportRef = React.useRef(false);
 
   const LAST_VIEWPORT_KEY = 'MapTab:lastViewport';
+  const BASEMAP_KEY = 'MapTab:basemap';
+
+  // Basemap state with localStorage persistence
+  const [activeBasemap, setActiveBasemap] = useState<BasemapType>(() => {
+    if (typeof window === 'undefined') return 'street';
+    try {
+      const saved = window.localStorage.getItem(BASEMAP_KEY);
+      if (saved === 'street' || saved === 'terrain' || saved === 'satellite') {
+        return saved;
+      }
+    } catch (err) {
+      console.error('Failed to load saved basemap:', err);
+    }
+    return 'street';
+  });
+
+  const [isBasemapMenuOpen, setIsBasemapMenuOpen] = useState(false);
+
+  const handleBasemapChange = (basemap: BasemapType) => {
+    setActiveBasemap(basemap);
+    setIsBasemapMenuOpen(false); // Close menu after selection
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(BASEMAP_KEY, basemap);
+      } catch (err) {
+        console.error('Failed to save basemap preference:', err);
+      }
+    }
+  };
 
   type LatLng = [number, number];
 
@@ -400,7 +431,7 @@ export const MapTab: React.FC = () => {
 
 
   return (
-    <div className="h-full relative">
+    <div className="h-full relative overflow-visible">
       {/* Loading indicators */}
       {(locationsLoading || geofencesLoading) && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg px-4 py-2 shadow-lg z-[1000] flex items-center gap-2">
@@ -436,8 +467,76 @@ export const MapTab: React.FC = () => {
         markers={markers}
         selectedPolygonId={selectedGeofenceId}
         autoFitBounds={!hasSavedViewport}
+        basemap={activeBasemap}
         className="w-full h-full"
       />
+
+      {/* Basemap Selector - Collapsible menu */}
+      <div 
+        className="absolute bottom-4 left-4 pointer-events-auto"
+        style={{ zIndex: 2000 }}
+      >
+        <div className="relative">
+          {/* Toggle button - small icon */}
+          <button
+            type="button"
+            onClick={() => setIsBasemapMenuOpen(!isBasemapMenuOpen)}
+            className="bg-white rounded-lg shadow-xl p-2 border-2 border-gray-300 hover:bg-gray-50 transition-colors"
+            aria-label="Toggle basemap selector"
+            title="Basemap layers"
+          >
+            <Layers className="w-5 h-5 text-gray-700" />
+          </button>
+
+          {/* Expandable menu - expands upward */}
+          {isBasemapMenuOpen && (
+            <div 
+              className="absolute left-0 bg-white rounded-lg shadow-xl p-2 flex flex-col gap-2 border-2 border-gray-300"
+              style={{ bottom: 'calc(100% + 8px)' }}
+            >
+              <button
+                type="button"
+                onClick={() => handleBasemapChange('street')}
+                className={`p-2 rounded-md transition-all ${
+                  activeBasemap === 'street'
+                    ? 'bg-[var(--grass-green)] text-white ring-2 ring-[var(--deep-forest)]'
+                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                }`}
+                aria-label="Street map"
+                title="Street map"
+              >
+                <Map className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBasemapChange('terrain')}
+                className={`p-2 rounded-md transition-all ${
+                  activeBasemap === 'terrain'
+                    ? 'bg-[var(--grass-green)] text-white ring-2 ring-[var(--deep-forest)]'
+                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                }`}
+                aria-label="Terrain map"
+                title="Terrain map"
+              >
+                <Mountain className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBasemapChange('satellite')}
+                className={`p-2 rounded-md transition-all ${
+                  activeBasemap === 'satellite'
+                    ? 'bg-[var(--grass-green)] text-white ring-2 ring-[var(--deep-forest)]'
+                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                }`}
+                aria-label="Satellite imagery"
+                title="Satellite imagery"
+              >
+                <Satellite className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Bottom Controls - Show Edit Zone button when polygon is selected */}
       {selectedGeofenceId && (

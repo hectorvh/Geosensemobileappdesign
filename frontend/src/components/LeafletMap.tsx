@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 
+type BasemapType = 'street' | 'terrain' | 'satellite';
+
 interface MapProps {
   center: [number, number];
   zoom: number;
@@ -29,6 +31,10 @@ interface MapProps {
    * to polygons + markers once on initial render.
    */
   autoFitBounds?: boolean;
+  /**
+   * Basemap tile layer to display
+   */
+  basemap?: BasemapType;
 }
 
 export const LeafletMap: React.FC<MapProps> = ({
@@ -44,6 +50,7 @@ export const LeafletMap: React.FC<MapProps> = ({
   selectedPolygonId,
   className = '',
   autoFitBounds = false,
+  basemap = 'street',
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -58,7 +65,38 @@ export const LeafletMap: React.FC<MapProps> = ({
   const currentZoomRef = useRef<number>(zoom);
   const isUserInteractionRef = useRef<boolean>(false);
   const hasAutoFittedRef = useRef<boolean>(false);
+  const currentBasemapRef = useRef<BasemapType>(basemap);
 
+  // Get tile layer URL and attribution based on basemap type
+  const getTileLayerConfig = (basemapType: BasemapType) => {
+    switch (basemapType) {
+      case 'street':
+        return {
+          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+        };
+      case 'terrain':
+        return {
+          url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+          attribution: '© OpenStreetMap contributors, © OpenTopoMap',
+          maxZoom: 17,
+        };
+      case 'satellite':
+        // Using Esri World Imagery (free, no API key required)
+        return {
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          attribution: '© Esri',
+          maxZoom: 19,
+        };
+      default:
+        return {
+          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+        };
+    }
+  };
 
   // Initialize map
   useEffect(() => {
@@ -70,14 +108,16 @@ export const LeafletMap: React.FC<MapProps> = ({
       attributionControl: true,
     }).setView(center, zoom);
 
-    // Add OpenStreetMap tiles
-    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
+    // Add initial tile layer based on basemap prop
+    const tileConfig = getTileLayerConfig(basemap);
+    const tileLayer = L.tileLayer(tileConfig.url, {
+      attribution: tileConfig.attribution,
+      maxZoom: tileConfig.maxZoom,
     });
     
     tileLayer.addTo(map);
     tileLayerRef.current = tileLayer;
+    currentBasemapRef.current = basemap;
 
     // Handle map clicks (but not on polygons/markers)
     map.on('click', (e: any) => {
@@ -128,6 +168,26 @@ export const LeafletMap: React.FC<MapProps> = ({
       }
     };
   }, []);
+
+  // Update tile layer when basemap changes
+  useEffect(() => {
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    if (currentBasemapRef.current === basemap) return; // Already using this basemap
+
+    // Remove old tile layer
+    mapInstanceRef.current.removeLayer(tileLayerRef.current);
+
+    // Add new tile layer
+    const tileConfig = getTileLayerConfig(basemap);
+    const newTileLayer = L.tileLayer(tileConfig.url, {
+      attribution: tileConfig.attribution,
+      maxZoom: tileConfig.maxZoom,
+    });
+    
+    newTileLayer.addTo(mapInstanceRef.current);
+    tileLayerRef.current = newTileLayer;
+    currentBasemapRef.current = basemap;
+  }, [basemap]);
 
   // Update zoom change callback
   useEffect(() => {
