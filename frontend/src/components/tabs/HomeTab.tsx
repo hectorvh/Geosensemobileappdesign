@@ -99,14 +99,11 @@ export const HomeTab: React.FC = () => {
               from: { pathname: '/main', mainTab: 'home' }
             }
           })}
-          className="w-full bg-white/90 backdrop-blur-sm rounded-2xl p-5 text-left hover:bg-white transition-colors active:bg-white/95"
+          className="w-full bg-white/90 backdrop-blur-sm rounded-2xl p-5 hover:bg-white transition-colors active:bg-white/95"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Smartphone className="w-6 h-6 text-[var(--accent-aqua)]" />
-              <h4 className="text-[var(--deep-forest)]">Manage Devices</h4>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center justify-center gap-3">
+            <Smartphone className="w-6 h-6 text-[var(--accent-aqua)]" />
+            <h4 className="text-[var(--deep-forest)] text-[22px]">Manage Devices</h4>
           </div>
         </button>
         
@@ -121,71 +118,98 @@ export const HomeTab: React.FC = () => {
             .filter(Boolean)
             .join(' ')}
         >
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-center gap-3 mb-2">
             <AlertTriangle className="w-6 h-6 text-red-500" />
-            <h3 className="text-[var(--deep-forest)]">Active Alerts</h3>
+            <h3 className="text-[var(--deep-forest)] text-[22px]">Active Alerts</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{counts.activeAlerts} Alerts</p>
+          <p className="text-center">
+            <span className="text-[56px] font-black text-[var(--deep-forest)]" style={{ 
+              letterSpacing: '-0.02em',
+              textShadow: '0 4px 12px rgba(239, 68, 68, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2)',
+              filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.3))'
+            }}>
+              {counts.activeAlerts}
+            </span>
+          </p>
           {counts.activeAlerts > 0 && (
-            <p className="text-sm text-red-600 mt-1">
+            <p className="text-[18px] text-red-600 mt-1 text-center">
               Requires your attention
             </p>
           )}
         </div>
 
-        {/* Animals Inside */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle2 className="w-6 h-6 text-[var(--grass-green)]" />
-            <h3 className="text-[var(--deep-forest)]">Animals Inside</h3>
-          </div>
-          <p className="text-[var(--deep-forest)]">{counts.animalsInside} Animals</p>
-        </div>
-
-        {/* Animals Outside */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <AlertTriangle className="w-6 h-6 text-orange-500" />
-            <h3 className="text-[var(--deep-forest)]">Animals Outside</h3>
-          </div>
-          <p className="text-[var(--deep-forest)]">{counts.animalsOutside} Animals</p>
-          {counts.animalsOutside > 0 && (
-            <p className="text-sm text-orange-600 mt-1">
-              Check map for details
+        {/* Compact 2×2 Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Inside */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 flex flex-col items-center justify-center min-h-[100px]">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <CheckCircle2 className="w-4 h-4 text-[var(--grass-green)]" />
+              <h4 className="text-[var(--deep-forest)] text-[22px] font-medium">Inside</h4>
+            </div>
+            <p className="text-[48px] font-black text-[var(--deep-forest)] my-2" style={{ 
+              letterSpacing: '-0.02em',
+              textShadow: '0 4px 12px rgba(120, 166, 74, 0.35), 0 2px 4px rgba(0, 0, 0, 0.2)',
+              filter: 'drop-shadow(0 0 6px rgba(120, 166, 74, 0.25))'
+            }}>
+              {counts.animalsInside}
             </p>
-          )}
-        </div>
-
-        {/* Devices Inactive (grey markers) */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <AlertTriangle className="w-6 h-6 text-gray-500" />
-            <h3 className="text-[var(--deep-forest)]">Devices Inactive</h3>
+            <p className="text-[var(--deep-forest)] text-[18px] text-center">Animals</p>
           </div>
-          <p className="text-[var(--deep-forest)]">
-            {counts.inactiveDevices} Devices without recent location updates
-          </p>
-        </div>
-
-        {/* Active Zones */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle2 className="w-6 h-6 text-[var(--accent-aqua)]" />
-            <h3 className="text-[var(--deep-forest)]">Active Zones</h3>
+          {/* Outside */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 flex flex-col items-center justify-center min-h-[100px]">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <h4 className="text-[var(--deep-forest)] text-[22px] font-medium">Outside</h4>
+            </div>
+            <p className="text-[30px] font-black bg-gradient-to-br from-orange-500 to-red-500 bg-clip-text text-transparent drop-shadow-md my-2" style={{ letterSpacing: '0.1em', textShadow: '0 2px 8px rgba(249, 115, 22, 0.3)' }}>
+              {counts.animalsOutside}
+            </p>
+            <p className="text-[var(--deep-forest)] text-[18px] text-center">Animals</p>
           </div>
-          <p className="text-[var(--deep-forest)]">
-            {counts.activeGeofences} Zones currently defined for your herd
-          </p>
+          {/* Inactive */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 flex flex-col items-center justify-center min-h-[100px]">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-gray-500" />
+              <h4 className="text-[var(--deep-forest)] text-[22px] font-medium">Inactive</h4>
+            </div>
+            <p className="text-[48px] font-black text-[var(--deep-forest)] my-2" style={{ 
+              letterSpacing: '-0.02em',
+              textShadow: '0 4px 12px rgba(107, 114, 128, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)',
+              filter: 'drop-shadow(0 0 6px rgba(107, 114, 128, 0.2))'
+            }}>
+              {counts.inactiveDevices}
+            </p>
+            <p className="text-[var(--deep-forest)] text-[18px] text-center">Devices</p>
+          </div>
+          {/* Zones */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 flex flex-col items-center justify-center min-h-[100px]">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <CheckCircle2 className="w-4 h-4 text-[var(--accent-aqua)]" />
+              <h4 className="text-[var(--deep-forest)] text-[22px] font-medium">Zones</h4>
+            </div>
+            <p className="text-[30px] font-black bg-gradient-to-br from-[var(--accent-aqua)] to-cyan-600 bg-clip-text text-transparent drop-shadow-md my-2" style={{ letterSpacing: '0.1em', textShadow: '0 2px 8px rgba(34, 211, 238, 0.3)' }}>
+              {counts.activeGeofences}
+            </p>
+            <p className="text-[var(--deep-forest)] text-[18px] text-center">Active</p>
+          </div>
         </div>
 
         {/* Last Update */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-center gap-3 mb-2">
             <Clock className="w-6 h-6 text-[var(--accent-aqua)]" />
-            <h3 className="text-[var(--deep-forest)]">Last Update</h3>
+            <h3 className="text-[var(--deep-forest)] text-[22px]">Last Update</h3>
           </div>
-          <p className="text-[var(--deep-forest)]">{formatTime(lastUpdate)}</p>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-center">
+            <span className="text-[48px] font-black text-[var(--deep-forest)]" style={{ 
+              letterSpacing: '-0.02em',
+              textShadow: '0 4px 12px rgba(34, 211, 238, 0.35), 0 2px 4px rgba(0, 0, 0, 0.2)',
+              filter: 'drop-shadow(0 0 6px rgba(34, 211, 238, 0.25))'
+            }}>
+              {formatTime(lastUpdate)}
+            </span>
+          </p>
+          <p className="text-[18px] text-gray-600 mt-1 text-center">
             System is monitoring your herd
           </p>
         </div>
