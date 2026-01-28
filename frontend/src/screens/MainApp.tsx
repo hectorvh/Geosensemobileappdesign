@@ -6,6 +6,7 @@ import { MapTab } from '../components/tabs/MapTab';
 import { AlertsTab } from '../components/tabs/AlertsTab';
 import { AnalyticsTab } from '../components/tabs/AnalyticsTab';
 import { useApp } from '../contexts/AppContext';
+import logo from '../assets/logo.png';
 
 export const MainApp: React.FC = () => {
   const navigate = useNavigate();
@@ -47,12 +48,20 @@ export const MainApp: React.FC = () => {
     <div className="mobile-screen flex flex-col">
       {/* Header */}
       <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center justify-between shrink-0 relative">
-        <h2
-          className="mb-2"
-          style={{ fontWeight: 700, fontSize: '1.4rem' }}
-        >
-          GeoSense
-        </h2>
+        <div className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="GeoSense logo" 
+            className="w-12 h-12"
+            style={{ objectFit: 'contain' }}
+          />
+          <h2
+            className="mb-2"
+            style={{ fontWeight: 700, fontSize: '1.4rem' }}
+          >
+            GeoSense
+          </h2>
+        </div>
         <button
           onClick={() => navigate('/settings', {
             state: {

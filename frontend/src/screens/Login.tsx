@@ -61,13 +61,15 @@ export const Login: React.FC = () => {
       />
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-sm px-6 relative z-10">
-          <h1
-            className="text-white text-center mb-2"
-            style={{ fontWeight: 700, fontSize: '3rem' }}
-          >
-            Log In
-          </h1>
+      <div className="absolute bottom-0 left-0 right-0 z-10 w-full max-w-sm px-6 pb-8 mx-auto">
+
+        
+        <h1
+          className="text-white text-center mb-2"
+          style={{ fontWeight: 700, fontSize: '3rem' }}
+        >
+          Log In
+        </h1>
         
         <form onSubmit={handleLogin} className="space-y-4">
           {error && (
