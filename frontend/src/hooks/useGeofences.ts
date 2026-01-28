@@ -5,13 +5,17 @@ export interface Geofence {
   id: number;
   name: string;
   user_id: string;
+  // Supabase/PostGIS geometry(MultiPolygon, 4326) is serialized as GeoJSON.
+  // We accept either Polygon or MultiPolygon in the API response.
   boundary_inner: {
-    type: 'Polygon';
-    coordinates: number[][][];
+    type: 'Polygon' | 'MultiPolygon';
+    // Polygon:        number[][][]      ( [ [ [lng,lat], ... ] ] )
+    // MultiPolygon:   number[][][][]    ( [ [ [ [lng,lat], ... ] ], ... ] )
+    coordinates: number[][][] | number[][][][];
   };
   boundary_outer?: {
-    type: 'Polygon';
-    coordinates: number[][][];
+    type: 'Polygon' | 'MultiPolygon';
+    coordinates: number[][][] | number[][][][];
   } | null;
   buffer_m: number;
   created_at: string;

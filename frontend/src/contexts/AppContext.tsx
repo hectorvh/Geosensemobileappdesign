@@ -46,6 +46,8 @@ export interface User {
   units: 'km' | 'miles';
 }
 
+export type MainTab = 'home' | 'map' | 'alerts' | 'analytics';
+
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
@@ -63,6 +65,8 @@ interface AppContextType {
   addGeofence: (geofence: Geofence) => void;
   updateGeofence: (id: string, updates: Partial<Geofence>) => void;
   removeGeofence: (id: string) => void;
+  activeMainTab: MainTab;
+  setActiveMainTab: (tab: MainTab) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -77,6 +81,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     lowBattery: true,
     inactivity: true,
   });
+  const [activeMainTab, setActiveMainTab] = useState<MainTab>('home');
 
   const addDevice = (device: Device) => {
     setDevices((prev) => [...prev, device]);
@@ -125,6 +130,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addGeofence,
         updateGeofence,
         removeGeofence,
+        activeMainTab,
+        setActiveMainTab,
       }}
     >
       {children}

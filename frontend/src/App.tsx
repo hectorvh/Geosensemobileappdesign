@@ -13,6 +13,7 @@ import { CustomizeAlerts } from './screens/CustomizeAlerts';
 import { MainApp } from './screens/MainApp';
 import { Settings } from './screens/Settings';
 import { Toaster } from './components/ui/sonner';
+import { AlertNotifier } from './components/AlertNotifier';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -168,6 +169,7 @@ export default function App() {
       <AppProvider>
         <div className="app-container">
           <AppContent />
+          <AlertNotifier />
           <Toaster />
         </div>
       </AppProvider>

@@ -1,22 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, Map as MapIcon, Bell, BarChart3, Settings } from 'lucide-react';
 import { HomeTab } from '../components/tabs/HomeTab';
 import { MapTab } from '../components/tabs/MapTab';
 import { AlertsTab } from '../components/tabs/AlertsTab';
 import { AnalyticsTab } from '../components/tabs/AnalyticsTab';
-
-type TabType = 'home' | 'map' | 'alerts' | 'analytics';
+import { useApp } from '../contexts/AppContext';
 
 export const MainApp: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const { activeMainTab, setActiveMainTab } = useApp();
 
   const tabs = [
-    { id: 'home' as TabType, icon: Home, label: 'Home' },
-    { id: 'map' as TabType, icon: MapIcon, label: 'Map' },
-    { id: 'alerts' as TabType, icon: Bell, label: 'Alerts' },
-    { id: 'analytics' as TabType, icon: BarChart3, label: 'Analytics' },
+    { id: 'home' as const, icon: Home, label: 'Home' },
+    { id: 'map' as const, icon: MapIcon, label: 'Map' },
+    { id: 'alerts' as const, icon: Bell, label: 'Alerts' },
+    { id: 'analytics' as const, icon: BarChart3, label: 'Analytics' },
   ];
 
   return (
@@ -39,10 +38,10 @@ export const MainApp: React.FC = () => {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden relative">
-        {activeTab === 'home' && <HomeTab />}
-        {activeTab === 'map' && <MapTab />}
-        {activeTab === 'alerts' && <AlertsTab />}
-        {activeTab === 'analytics' && <AnalyticsTab />}
+        {activeMainTab === 'home' && <HomeTab />}
+        {activeMainTab === 'map' && <MapTab />}
+        {activeMainTab === 'alerts' && <AlertsTab />}
+        {activeMainTab === 'analytics' && <AnalyticsTab />}
       </div>
 
       {/* Bottom Tab Navigation */}
@@ -50,11 +49,11 @@ export const MainApp: React.FC = () => {
         <div className="flex items-center justify-around p-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+            const isActive = activeMainTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setActiveMainTab(tab.id)}
                 className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
                   isActive
                     ? 'text-[var(--grass-green)]'

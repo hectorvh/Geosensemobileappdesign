@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 export interface Alert {
   id: string;
   device_id: string;
-  type_alert: 'Inactivity Detected' | 'Out of Range' | 'Low Battery';
+  // Include DB-driven 'out' / 'out_of_zone' types in addition to existing ones
+  type_alert: 'Inactivity Detected' | 'Out of Range' | 'Low Battery' | 'out' | 'out_of_zone';
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -23,22 +24,28 @@ export const useAlerts = (userId?: string, activeOnly: boolean = true) => {
 
   const fetchAlerts = async () => {
     if (!userId) {
+      setAlerts([]);
       setLoading(false);
       return;
     }
 
     try {
       setError(null);
+
       let query = supabase
         .from('alerts')
-        .select(`
+        .select(
+          `
           *,
           device:devices!alerts_device_id_fkey (
             id,
             animal_name,
             tracker_id
           )
-        `)
+        `
+        )
+        // Security: explicitly scope by user_id (defense in depth; RLS also applies)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (activeOnly) {
@@ -51,13 +58,7 @@ export const useAlerts = (userId?: string, activeOnly: boolean = true) => {
         throw fetchError;
       }
 
-      // Filter alerts to only those belonging to user's devices
-      const userAlerts = (data || []).filter((alert: any) => {
-        // The device join should already be filtered by RLS, but double-check
-        return alert.device;
-      });
-
-      setAlerts(userAlerts as Alert[]);
+      setAlerts((data || []) as Alert[]);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching alerts:', err);
@@ -67,9 +68,15 @@ export const useAlerts = (userId?: string, activeOnly: boolean = true) => {
   };
 
   useEffect(() => {
+    // Initial fetch
     fetchAlerts();
 
-    // Set up real-time subscription
+    if (!userId) {
+      return;
+    }
+
+    // Set up real-time subscription scoped to this user's alerts.
+    // Realtime still respects RLS; the filter reduces noisy events.
     const channel = supabase
       .channel('alerts_changes')
       .on(
@@ -78,17 +85,45 @@ export const useAlerts = (userId?: string, activeOnly: boolean = true) => {
           event: '*',
           schema: 'public',
           table: 'alerts',
+          filter: `user_id=eq.${userId}`,
         },
         () => {
+          // Re-fetch whenever any alert row for this user changes
           fetchAlerts();
         }
       )
       .subscribe();
 
+    // Fallback polling: ensure UI updates even if Realtime is not configured
+    const intervalId = window.setInterval(() => {
+      fetchAlerts();
+    }, 10000); // every 10 seconds
+
     return () => {
       supabase.removeChannel(channel);
+      window.clearInterval(intervalId);
     };
   }, [userId, activeOnly]);
 
-  return { alerts, loading, error, refetch: fetchAlerts };
+  const deleteAlert = async (id: string, ownerId?: string) => {
+    // ownerId is passed for explicit defense-in-depth filtering
+    if (!ownerId) {
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from('alerts')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', ownerId);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    // Optimistically update local state
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  return { alerts, loading, error, refetch: fetchAlerts, deleteAlert };
 };

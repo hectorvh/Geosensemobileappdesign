@@ -209,7 +209,7 @@ export const MapTab: React.FC = () => {
       const secondsSinceUpdate = (now.getTime() - updatedAt.getTime()) / 1000;
       
       // Determine if location is active (updated within last 1 minute)
-      const live_location_active = secondsSinceUpdate <= 60;
+      const live_location_active = secondsSinceUpdate <= 30;
       
       // Check if device has active alert
       // Find device by tracker_id, then check if it has active alerts
