@@ -5,6 +5,7 @@ import { useAlerts } from '../../hooks/useAlerts';
 import { useLiveLocations } from '../../hooks/useLiveLocations';
 import { ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
 
 export const AnalyticsTab: React.FC = () => {
   const { user } = useAuth();
@@ -95,8 +96,15 @@ export const AnalyticsTab: React.FC = () => {
   }, [locations, alerts]);
 
   return (
-    <div className="h-full bg-gray-50 overflow-y-auto">
-      <div className="p-4 space-y-4">
+    <div className="h-full green-gradient-bg overflow-y-auto relative">
+      {/* Background Image Overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-20"
+        style={{
+          backgroundImage: `url(${welcomeImage})`
+        }}
+      />
+      <div className="p-4 space-y-4 relative z-10">
         {/* Herd Overview */}
         <div className="bg-white rounded-lg p-4 shadow-sm">
           <h4 className="text-[var(--deep-forest)] mb-3">Herd Overview</h4>

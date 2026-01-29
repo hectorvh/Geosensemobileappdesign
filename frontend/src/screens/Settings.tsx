@@ -6,6 +6,7 @@ import { useApp } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, User, MapPin, Smartphone, Bell, Globe, Ruler, LogOut } from 'lucide-react';
 import logo from '../assets/logo.png';
+import welcomeImage from '../assets/20250621-P1300259-2-3.jpg';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -83,9 +84,16 @@ export const Settings: React.FC = () => {
   ];
 
   return (
-    <div className="mobile-screen flex flex-col bg-gray-50">
+    <div className="mobile-screen flex flex-col green-gradient-bg relative">
+      {/* Background Image Overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-20"
+        style={{
+          backgroundImage: `url(${welcomeImage})`
+        }}
+      />
       {/* Header */}
-      <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center gap-3 shrink-0">
+      <div className="bg-[var(--deep-forest)] text-white p-4 flex items-center gap-3 shrink-0 relative z-10">
         <button
           onClick={handleSaveSettings}
           className="p-1 hover:bg-[var(--pine-green)] rounded-lg transition-colors"
@@ -104,7 +112,7 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10">
         {/* Profile Section */}
         <div className="bg-white rounded-lg p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
@@ -141,7 +149,6 @@ export const Settings: React.FC = () => {
           >
             <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
             <span className="flex-1 text-left text-[var(--deep-forest)]">Edit zones</span>
-            <span className="text-gray-400">→</span>
           </button>
           
           <button
@@ -155,7 +162,6 @@ export const Settings: React.FC = () => {
           >
             <Smartphone className="w-5 h-5 text-[var(--accent-aqua)]" />
             <span className="flex-1 text-left text-[var(--deep-forest)]">Manage Devices</span>
-            <span className="text-gray-400">→</span>
           </button>
           
           <button
@@ -169,7 +175,6 @@ export const Settings: React.FC = () => {
           >
             <Bell className="w-5 h-5 text-[var(--high-yellow)]" />
             <span className="flex-1 text-left text-[var(--deep-forest)]">Set Alerts</span>
-            <span className="text-gray-400">→</span>
           </button>
           
           <button
@@ -198,7 +203,6 @@ export const Settings: React.FC = () => {
           >
             <MapPin className="w-5 h-5 text-[var(--grass-green)]" />
             <span className="flex-1 text-left text-[var(--deep-forest)]">Tutorial</span>
-            <span className="text-gray-400">→</span>
           </button>
         </div>
 

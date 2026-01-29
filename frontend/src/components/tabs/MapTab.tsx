@@ -33,7 +33,7 @@ export const MapTab: React.FC = () => {
 
   // Basemap state with localStorage persistence
   const [activeBasemap, setActiveBasemap] = useState<BasemapType>(() => {
-    if (typeof window === 'undefined') return 'street';
+    if (typeof window === 'undefined') return 'satellite';
     try {
       const saved = window.localStorage.getItem(BASEMAP_KEY);
       if (saved === 'street' || saved === 'terrain' || saved === 'satellite') {
@@ -42,7 +42,7 @@ export const MapTab: React.FC = () => {
     } catch (err) {
       console.error('Failed to load saved basemap:', err);
     }
-    return 'street';
+    return 'satellite';
   });
 
   const [isBasemapMenuOpen, setIsBasemapMenuOpen] = useState(false);

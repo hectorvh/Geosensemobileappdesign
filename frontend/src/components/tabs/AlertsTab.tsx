@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Trash2,
 } from 'lucide-react';
+import welcomeImage from '../../assets/20250621-P1300259-2-3.jpg';
 
 export const AlertsTab: React.FC = () => {
   const navigate = useNavigate();
@@ -90,7 +91,14 @@ export const AlertsTab: React.FC = () => {
   };
 
   return (
-    <div className="h-full bg-gray-50 overflow-y-auto relative">
+    <div className="h-full green-gradient-bg overflow-y-auto relative">
+      {/* Background Image Overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-20"
+        style={{
+          backgroundImage: `url(${welcomeImage})`
+        }}
+      />
       <div className="p-4 space-y-3 relative z-10">
         {/* Set Alerts Box - Rebuilt for reliability */}
         <button
